@@ -51,6 +51,11 @@ GitHub만으로는 서버를 돌릴 수 없다(GitHub Pages는 고정 페이지�
 - 구글 트렌드는 0~100 지수. 같은 요청(같은 지역·구글/유튜브)에 넣은 검색어끼리만 높이 비교 가능
 - arctic-shift 월별 총계는 아카이브 집계라 실제와 조금 다를 수 있음
 
+## 레딧 전체 검색에 대해
+
+- arctic-shift는 서브레딧을 지정해야만 단어 검색이 된다. 그래서 "언급을 볼 서브레딧"을 여러 개 골라 합계를 본다.
+- PullPush는 서브레딧 없이 레딧 전체 검색이 되지만, 자동 수집은 운영자가 막아 두었다(응답: "does not provide free scraping resources for agents", 유료 문의는 Discord). 코드는 `app/sources/pullpush.py` 에 있고 기본은 꺼져 있다. 유료 이용을 협의한 뒤 `KT_PULLPUSH=1` 로 켜면 "레딧 전체" 탭이 생긴다.
+
 ## 아직 없는 것
 
 - 구글 트렌드 주간 값 이어붙이기(지금은 월별만)

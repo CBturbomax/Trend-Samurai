@@ -121,8 +121,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 <footer class="notes">
   <p><strong>월 합계</strong>가 기본. <strong>하루 평균</strong>으로 바꾸면 월 합계 ÷ 날짜 수(진행 중인 달은 오늘까지 일수)로 보여 줌. 자체 계산, 공식 수치 아님.</p>
   <p><strong>검색 관심도</strong>는 0~100 지수. 같은 요청(같은 괄호) 안의 선끼리만 높이 비교 가능.</p>
-  <p><strong>레딧 전체 언급</strong>은 PullPush 아카이브 기준이라 실제 레딧보다 몇 주 늦고, 빠진 글·댓글이 있을 수 있음.</p>
-  <p><strong>출처</strong> PullPush·arctic-shift(제3자 레딧 아카이브), Google Trends. 모두 비공식·무보증. 개인 리서치용.</p>
+    <p><strong>출처</strong> arctic-shift(제3자 레딧 아카이브), Google Trends. 둘 다 비공식·무보증. 개인 리서치용.</p>
 </footer>
 </main>
 
@@ -130,7 +129,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=async(u,o)=>{const r=await fetch(u,o&&{method:o.method||'POST',headers:{'content-type':'application/json'},body:o.body&&JSON.stringify(o.body)});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);return r.json()};
 const PAL=['#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#B0BEC5'], Y='#FFCB05';
-const S={unit:'total',kid:null,data:null,tab:'global',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
+const S={unit:'total',kid:null,data:null,tab:'own',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
 const REG={};
 
 /* ───── 숫자·날짜 ───── */
@@ -255,7 +254,7 @@ function yearTable(d){
   const rows=[];
   ownSeries(d,1).forEach(s=>rows.push({label:`${s.name} 댓글${UN().s}${S.unit==='daily'?'':' (월평균)'}`,short:'댓글'+UN().s,s}));
   ownSeries(d,0).forEach(s=>rows.push({label:`${s.name} 글${UN().s}${S.unit==='daily'?'':' (월평균)'}`,short:'글'+UN().s,s}));
-  if(d.global){const gc=globalSeries(d,'comment',true)[0],gp=globalSeries(d,'submission',true)[0];if(Object.keys(gc.pts).length)rows.push({label:'레딧 전체 언급 댓글 (월평균)',short:'전체 댓글',s:gc});if(Object.keys(gp.pts).length)rows.push({label:'레딧 전체 언급 글 (월평균)',short:'전체 글',s:gp})}
+  if(d.global&&d.global.enabled){const gc=globalSeries(d,'comment',true)[0],gp=globalSeries(d,'submission',true)[0];if(Object.keys(gc.pts).length)rows.push({label:'레딧 전체 언급 댓글 (월평균)',short:'전체 댓글',s:gc});if(Object.keys(gp.pts).length)rows.push({label:'레딧 전체 언급 글 (월평균)',short:'전체 글',s:gp})}
   mentionBySub(d).forEach(s=>rows.push({label:`언급 ${s.name} (월평균)`,short:'언급 '+s.name.replace('r/','').slice(0,6),s}));
   trendSeries(d).filter(s=>s.isSum||d.variants.length===1).forEach(s=>rows.push({label:`검색 ${s.group} (지수)`,short:s.group.replace('·',' '),s}));
   const pct=(a,b)=>a==null||b==null||b===0?'<td>–</td>':`<td class="${a>=b?'up':'down'}">${a>=b?'+':''}${((a/b-1)*100).toFixed(0)}%</td>`;
@@ -331,7 +330,7 @@ function kpis(d){
   const men=mentionBySub(d)[0],tr=trendSeries(d).filter(s=>s.group==='구글·미국'),t=tr.find(s=>s.isSum)||tr[0];
   const k=(cls,label,v)=>`<div class="kpi ${cls}"><span class="kpi-label">${label}</span><strong class="kpi-num">${v}</strong></div>`;
   return k('is-done',UN().t+'댓글 · '+lm,fmtS(sum(ownSeries(d,1)))||'–')+k('is-total',UN().t+'글',fmtS(sum(ownSeries(d,0)))||'–')
-    +k('is-todo',...(()=>{const gc=globalSeries(d,'comment',true)[0].pts,gp=globalSeries(d,'submission',true)[0].pts,ms=Object.keys(gc).filter(m=>gp[m]!=null).sort(),m=ms[ms.length-1];return m?['레딧 전체 언급 · '+m,fmtS(gc[m]+gp[m])]:['레딧 전체 언급','–']})())+k('is-blue','구글 관심도 · 미국',t&&t.pts[lm]!=null?fmtS(t.pts[lm]):'–')
+    +k('is-todo',...(()=>{if(!(d.global&&d.global.enabled))return['언급 글 수 · 월',men&&men.pts[lm]!=null?fmtS(men.pts[lm]):'–'];const gc=globalSeries(d,'comment',true)[0].pts,gp=globalSeries(d,'submission',true)[0].pts,ms=Object.keys(gc).filter(m=>gp[m]!=null).sort(),m=ms[ms.length-1];return m?['레딧 전체 언급 · '+m,fmtS(gc[m]+gp[m])]:['레딧 전체 언급','–']})())+k('is-blue','구글 관심도 · 미국',t&&t.pts[lm]!=null?fmtS(t.pts[lm]):'–')
     +k('is-blue','수집 진행',`<span id="kpiProg">${S.prog==null?'–':S.prog+'%'}</span>`);
 }
 function render(){
@@ -339,7 +338,7 @@ function render(){
   $('#kpis').innerHTML=kpis(d);
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
   $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span></div>
-   <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
+   <div class="filters">${tg(TABS.filter(t=>t[0]!=='global'||(d.global&&d.global.enabled)),'tab',S.tab,'tab')}</div>
    <div class="filters">${tg([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}
    ${tg([['total','월 합계'],['daily','하루 평균']],'unit',S.unit,'u')}
    <button id="btnLabels" class="btn pc ${S.allLabels?'main':''}">모든 점 라벨</button>
@@ -395,7 +394,7 @@ const vals=sel=>[...document.querySelectorAll(sel+':checked')].map(x=>x.value);
 
 document.addEventListener('click',async e=>{
   const t=e.target;
-  if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='global';select(r.id)}
+  if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='own';select(r.id)}
   else if(t.classList.contains('kwbtn'))select(+t.dataset.id);
   else if(t.classList.contains('tab')){S.tab=t.dataset.tab;render()}
   else if(t.classList.contains('rng')){S.range=t.dataset.r;render()}
@@ -415,7 +414,7 @@ document.addEventListener('change',async e=>{if(e.target.classList.contains('cmp
 /* ───── 내보내기: 차트 포함 단일 HTML ───── */
 function exportHtml(){
   const d=S.data,keep=S.tab;let body='';
-  ['global','own','mention','trend','year'].forEach(k=>{S.tab=k;body+=k==='mention'?mentionCharts(d):VIEW[k](d)});S.tab=keep;render();
+  ['global','own','mention','trend','year'].filter(k=>k!=='global'||(d.global&&d.global.enabled)).forEach(k=>{S.tab=k;body+=k==='mention'?mentionCharts(d):VIEW[k](d)});S.tab=keep;render();
   const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.keyword)} 리포트</title>
 <link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1><p class="dash-sub">Trend Samurai by CB · 레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</p></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
 <footer class="notes"><p>개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 <strong>자체 계산값은 공식 수치가 아닙니다.</strong></p></footer></main></body></html>`;

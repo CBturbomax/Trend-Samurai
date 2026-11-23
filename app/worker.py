@@ -57,7 +57,7 @@ def enqueue_keyword(kid, refresh=False):
         _add(kid, "trends", 1, gprop=gprop or "web", geo=geo or "WW")
     done = {(r["kind"], r["month"]) for r in q(
         "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
-    for m in reversed(all_months()):
+    for m in reversed(all_months() if C.PULLPUSH_ENABLED else []):
         for kind in ("comment", "submission"):
             if (kind, m) not in done:
                 _add(kid, "global", 2, term=kind, month=m)

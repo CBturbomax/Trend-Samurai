@@ -23,6 +23,8 @@ from .sources import arctic
 @asynccontextmanager
 async def lifespan(app):
     db.init()
+    if not C.PULLPUSH_ENABLED:
+        x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
     worker.start()
@@ -168,7 +170,11 @@ def status(kid: int | None = None):
     holds = [dict(r) for r in q(
         f"SELECT sub, term, COUNT(*) n, MIN(start) first, MAX(end) last, MAX(msg) msg, MIN(next_at) next_at "
         f"FROM jobs {where + ' AND' if where else 'WHERE'} status IN ('hold','failed') GROUP BY kind, sub, term", args)]
+    waiting = [dict(r) for r in q(
+        f"SELECT kind, COUNT(*) n, MIN(next_at) next_at, MAX(msg) msg FROM jobs "
+        f"{where + ' AND' if where else 'WHERE'} status='queued' AND next_at>? GROUP BY kind", (*args, time.time()))]
     return {
+        "waiting": waiting,
         "current": worker.describe(cur) if cur else None,
         "current_kid": cur["keyword_id"] if cur else None,
         "note": worker.state["note"],
@@ -219,7 +225,7 @@ def build(kid: int):
 
     # 레딧 전체 언급
     own_names = {s["name"].lower() for s in subs if s["kind"] == "own"}
-    glob = {"submission": {}, "comment": {}, "coverage": {}, "top_subs": []}
+    glob = {"enabled": C.PULLPUSH_ENABLED, "submission": {}, "comment": {}, "coverage": {}, "top_subs": []}
     for r in q("SELECT kind, month, status, total FROM global_months WHERE keyword_id=?", (kid,)):
         glob[r["kind"]][r["month"]] = {"total": r["total"], "own": 0, "partial": int(r["status"] != "done")}
     top = {}
