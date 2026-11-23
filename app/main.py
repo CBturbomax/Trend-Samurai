@@ -68,9 +68,10 @@ class SuggestIn(BaseModel):
 
 @app.post("/api/suggest")
 def suggest(body: SuggestIn):
-    vs = variants.suggest(body.keyword)
-    if not vs:
+    sug = variants.suggest(body.keyword)
+    if not sug:
         raise HTTPException(400, "키워드를 입력하세요")
+    vs = [t for t, _ in sug]
     names = {v.replace(" ", "").replace("-", "") for v in vs}
     subs, seen, err = [], set(), ""
     for prefix in sorted({min(names, key=len)}):
@@ -87,7 +88,7 @@ def suggest(body: SuggestIn):
                 err = f"서브레딧 검색 실패: {e}"
                 time.sleep(4)
     subs.sort(key=lambda s: (-s["exact"], -s["subscribers"]))
-    return {"variants": vs, "subs": subs, "error": err}
+    return {"variants": vs, "checked": [t for t, c in sug if c], "subs": subs, "error": err}
 
 
 class KeywordIn(BaseModel):
@@ -112,6 +113,9 @@ def create_keyword(body: KeywordIn):
     x("DELETE FROM variants WHERE keyword_id=?", (kid,))
     for t in terms:
         x("INSERT OR IGNORE INTO variants VALUES(?,?)", (kid, t))
+    # 뺀 변형의 남은 검색 작업은 취소
+    x(f"DELETE FROM jobs WHERE keyword_id=? AND kind='mention' AND status!='done' "
+      f"AND term NOT IN ({','.join('?' * len(terms))})", (kid, *terms))
     for kind, subs in (("own", body.own_subs), ("mention", body.mention_subs)):
         for s in filter(None, map(_clean_sub, subs)):
             x("INSERT OR REPLACE INTO subreddits VALUES(?,?,?)", (kid, s, kind))
