@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TREND SAMURAI — 레딧 + 검색 관심도</title>
+<title>Trend Samurai — 레딧 + 검색 관심도</title>
 <link rel="icon" href="/static/samurai-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet">
@@ -24,7 +24,9 @@ a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
 #result{display:flex;flex-direction:column;gap:44px} #result:empty,#progress:empty,#kpis:empty{display:none}
 .dash-head{display:flex;align-items:center;gap:22px;padding-bottom:28px;border-bottom:2px solid var(--line)}
 .brand-mark{width:68px;height:68px;flex:none;object-fit:contain}
-.dash-head h1{font-size:var(--fs-h1);font-weight:800;letter-spacing:.06em;line-height:1.1}
+.dash-head h1{font-size:var(--fs-h1);font-weight:800;letter-spacing:0;line-height:1.1}
+.brand-accent{color:#ffa826}
+.brand-by{font-size:.42em;font-weight:500;color:#8b97a3;margin-left:.2em;white-space:nowrap}
 .dash-sub{margin-top:8px;font-size:var(--fs-body);opacity:.72}
 .kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}
 .kpi{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--line);padding:22px 24px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -99,7 +101,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 <main class="dash">
 <header class="dash-head">
   <img class="brand-mark" src="/static/samurai-icon.png" alt="">
-  <div><h1>TREND SAMURAI</h1><p class="dash-sub">레딧 + 검색 관심도 키워드 트래커 · 2019년부터 월별</p></div>
+  <div><h1>Trend <span class="brand-accent">Samurai</span> <span class="brand-by">by CB</span></h1><p class="dash-sub">레딧 + 검색 관심도 키워드 트래커 · 2019년부터 월별</p></div>
 </header>
 
 <section class="panel" id="add">
@@ -391,7 +393,7 @@ function exportHtml(){
   const d=S.data,keep=S.tab;let body='';
   ['own','mention','trend','year'].forEach(k=>{S.tab=k;body+=k==='mention'?mentionCharts(d):VIEW[k](d)});S.tab=keep;render();
   const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.keyword)} 리포트</title>
-<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1><p class="dash-sub">TREND SAMURAI · 레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</p></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
+<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1><p class="dash-sub">Trend Samurai by CB · 레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</p></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
 <footer class="notes"><p>개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 <strong>자체 계산값은 공식 수치가 아닙니다.</strong></p></footer></main></body></html>`;
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=`${d.keyword}-report-${d.today}.html`;a.click();
 }
