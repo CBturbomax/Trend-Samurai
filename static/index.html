@@ -3,77 +3,124 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>키워드 트래커</title>
+<title>TREND SAMURAI — 레딧 + 검색 관심도</title>
+<link rel="icon" href="/static/samurai-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet">
 <style id="css">
-:root{--bg:#0f1419;--card:#161d25;--box:#1b232c;--line:#2a3540;--y:#FFCB05;--b:#5B9BD5;--o:#ED7D31;--t:#FFFFFF;--dim:#9aa7b3}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--t);font-family:"42dot Sans",system-ui,sans-serif;font-size:17px;line-height:1.5}
-main{max-width:1132px;margin:0 auto;padding:16px}
-h1{font-size:26px;margin:8px 0 16px}
-h2{font-size:20px;margin:0 0 10px}
-h3{font-size:21px;margin:0 0 2px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:0;padding:18px;margin:0 0 16px}
-.box{background:var(--box);border:1px solid var(--line);padding:10px 12px;margin:8px 0}
-.desc{color:var(--dim);font-size:15px;margin:0 0 10px}
-.foot{display:flex;justify-content:space-between;gap:12px;color:var(--dim);font-size:13px;margin-top:8px}
-.foot .src{text-align:right;white-space:nowrap}
-input[type=text]{background:var(--bg);border:1px solid var(--line);color:var(--t);font:inherit;padding:8px 10px;border-radius:0;min-width:0}
-button{background:var(--box);border:1px solid var(--line);color:var(--t);font:inherit;font-size:15px;padding:7px 12px;border-radius:0;cursor:pointer}
-button:hover{border-color:var(--b)}
-button.on{border-color:var(--y);color:var(--y)}
-button.main{background:var(--y);color:#111;border-color:var(--y);font-weight:700}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-label.ck{display:inline-flex;gap:6px;align-items:center;background:var(--box);border:1px solid var(--line);padding:5px 10px;font-size:15px}
-.dim{color:var(--dim)} .warn{color:var(--o)} .small{font-size:14px}
-.bar{height:10px;background:var(--box);border:1px solid var(--line);margin:8px 0}
-.bar i{display:block;height:100%;background:var(--y)}
-.legend{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
-.lg{font-size:14px;padding:3px 9px;display:inline-flex;align-items:center;gap:6px}
-.lg i{width:12px;height:12px;display:inline-block}
-.lg.off{opacity:.4;text-decoration:line-through}
-.chart{position:relative;max-width:1100px}
-.chart svg{display:block;width:100%;height:auto}
+/* TREND SAMURAI — 어닝사무라이 대시보드 테마를 따름: 각진 다크, 큰 글씨, 노랑 강조 */
+:root{--bg:#0f1419;--panel:#151b22;--panel-2:#1b232b;--line:#2a3540;--text:#ffffff;
+  --yellow:#ffcb05;--blue:#5b9bd5;--orange:#ed7d31;--up:#ff5a5a;--down:#5b9bd5;
+  --fs-h1:48px;--fs-h2:32px;--fs-kpi:54px;--fs-body:20px;--fs-cell:20px;--fs-head:19px;--fs-note:17px;
+  --card:var(--panel);--box:var(--panel-2);--y:var(--yellow);--b:var(--blue);--o:var(--orange);--t:var(--text)}
+html{font-family:"42dot Sans","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+*,*::before,*::after{font-family:inherit;box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+body{font-size:var(--fs-body);line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,p,figure{margin:0}
+button,input{font-size:inherit;color:inherit;background:none;border:none}
+a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+.dash{max-width:1220px;margin:0 auto;padding:44px 32px 96px;display:flex;flex-direction:column;gap:44px}
+#result{display:flex;flex-direction:column;gap:44px} #result:empty,#progress:empty,#kpis:empty{display:none}
+.dash-head{display:flex;align-items:center;gap:22px;padding-bottom:28px;border-bottom:2px solid var(--line)}
+.brand-mark{width:68px;height:68px;flex:none;object-fit:contain}
+.dash-head h1{font-size:var(--fs-h1);font-weight:800;letter-spacing:.06em;line-height:1.1}
+.dash-sub{margin-top:8px;font-size:var(--fs-body);opacity:.72}
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--line);padding:22px 24px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi-label{font-size:var(--fs-note);opacity:.66;letter-spacing:.04em}
+.kpi-num{font-size:var(--fs-kpi);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi.is-total{border-top-color:var(--text)}
+.kpi.is-done{border-top-color:var(--yellow)} .kpi.is-done .kpi-num{color:var(--yellow)}
+.kpi.is-todo{border-top-color:var(--orange)} .kpi.is-todo .kpi-num{color:var(--orange)}
+.kpi.is-blue{border-top-color:var(--blue)}
+.progress{display:flex;flex-direction:column;gap:12px}
+.progress-bar{display:flex;width:100%;height:34px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden}
+.progress-seg{display:flex;align-items:center;justify-content:center;font-size:var(--fs-note);font-weight:700;white-space:nowrap;overflow:hidden}
+.progress-seg.done{background:var(--yellow);color:#10161c} .progress-seg.todo{background:var(--orange);color:#10161c}
+.progress-legend{display:flex;flex-wrap:wrap;gap:26px;font-size:var(--fs-note);opacity:.8}
+.progress-legend span{display:inline-flex;align-items:center;gap:9px}
+.swatch{width:15px;height:15px;flex:none} .swatch.done{background:var(--yellow)} .swatch.todo{background:var(--orange)}
+.filters,.row{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.toggle-group{display:flex;flex-wrap:wrap;border:1px solid var(--line)}
+.toggle{padding:12px 22px;font-size:var(--fs-body);font-weight:700;cursor:pointer;background:var(--panel);border-right:1px solid var(--line)}
+.toggle:last-child{border-right:none}
+.toggle.on,.toggle[aria-pressed="true"]{background:var(--yellow);color:#10161c}
+.btn{padding:12px 22px;font-weight:700;cursor:pointer;background:var(--panel);border:1px solid var(--line)}
+.btn:hover{border-color:var(--yellow);color:var(--yellow)}
+.btn.main{background:var(--yellow);color:#10161c;border-color:var(--yellow)} .btn.main:hover{color:#10161c}
+.search-box{flex:1 1 320px;min-width:260px;display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);padding:11px 18px}
+.search-box input,input.wide{width:100%;font-size:var(--fs-body);outline:none}
+input.wide{background:var(--panel);border:1px solid var(--line);padding:11px 18px}
+input::placeholder{color:var(--text);opacity:.45}
+.panel{display:flex;flex-direction:column;gap:18px}
+.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:16px}
+.panel-head h2{font-size:var(--fs-h2);font-weight:800;letter-spacing:.02em}
+.panel-head .count,.desc{font-size:var(--fs-note);opacity:.7}
+.desc b{opacity:1}
+.box{background:var(--panel);border:1px solid var(--line);padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+label.ck,.chip{display:inline-flex;gap:9px;align-items:center;background:var(--panel-2);border:1px solid var(--line);padding:8px 14px;font-weight:700}
+.dim{opacity:.66;font-weight:400} .warn{color:var(--orange)} .small{font-size:var(--fs-note)}
+.legend{display:flex;flex-wrap:wrap;gap:10px}
+.lg{font-size:var(--fs-note);font-weight:700;padding:6px 12px;display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.lg i{width:15px;height:15px;display:inline-block} .lg.off{opacity:.4;text-decoration:line-through}
+.chart-box{background:var(--panel);border:1px solid var(--line);padding:18px;max-width:1100px}
+.chart-box svg{display:block;width:100%;height:auto}
 .pcwrap{position:relative}
-.tip{position:absolute;top:8px;pointer-events:none;background:var(--box);border:1px solid var(--line);padding:6px 10px;font-size:14px;white-space:nowrap;display:none;z-index:2}
-.tip b{color:var(--y)}
+.tip{position:absolute;top:8px;pointer-events:none;background:var(--panel-2);border:1px solid var(--line);padding:8px 12px;font-size:var(--fs-note);white-space:nowrap;display:none;z-index:2}
+.tip b{color:var(--yellow)}
 .mo{display:none}
-table{border-collapse:collapse;width:100%;font-size:15px}
-th,td{border:1px solid var(--line);padding:6px 8px;text-align:right;white-space:nowrap}
-th{background:var(--box);font-weight:500} td:first-child,th:first-child{text-align:left}
-td.up{color:var(--y)} td.down{color:var(--o)}
+.foot{display:flex;justify-content:space-between;gap:16px;font-size:var(--fs-note);opacity:.7;max-width:1100px}
+.foot .src{text-align:right;white-space:nowrap}
+.table-wrap{overflow-x:auto;border:1px solid var(--line)}
+.data-table{width:100%;border-collapse:collapse;font-size:var(--fs-cell);white-space:nowrap}
+.data-table th{background:var(--panel-2);font-size:var(--fs-head);font-weight:700;text-align:right;padding:13px 10px;border-bottom:2px solid var(--line)}
+.data-table td{padding:11px 10px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.data-table th:first-child,.data-table td:first-child{text-align:left}
+.data-table tbody tr:hover{background:var(--panel)}
+td.up{color:var(--up)} td.down{color:var(--down)}
 .h-mo{display:none}
+.notes{border-top:2px solid var(--line);padding-top:26px;display:flex;flex-direction:column;gap:10px;font-size:var(--fs-note);opacity:.72;line-height:1.7}
+.notes strong{color:var(--yellow);font-weight:700}
+@media(max-width:1180px){.kpi-strip{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:860px){.dash{padding:30px 18px 72px;gap:34px} #result{gap:34px} .kpi-strip{grid-template-columns:repeat(2,1fr)}
+  .dash-head{align-items:flex-start} .dash-head h1{word-break:keep-all;overflow-wrap:anywhere} .brand-mark{width:54px;height:54px}}
 @media(max-width:600px){
-  body{font-size:15px} main{padding:8px} .card{padding:12px} h3{font-size:17px}
+  :root{--fs-h1:34px;--fs-h2:24px;--fs-kpi:36px}
+  .dash{padding:24px 12px 60px} .kpi{padding:16px 14px} .toggle,.btn{padding:10px 14px} .chart-box{padding:10px}
   .pc{display:none} .mo{display:block}
-  table{font-size:10.5px} th,td{padding:4px 2px} .h-pc{display:none} .h-mo{display:inline}
-  .foot{flex-direction:column;gap:2px} .foot .src{text-align:left}
+  .foot{flex-direction:column;gap:2px} .foot .src{text-align:left;white-space:normal}
+  /* 연간 요약표는 폰 한 화면에 들어가게 줄임 */
+  .data-table{font-size:10.5px} .data-table th{font-size:10.5px;padding:5px 2px} .data-table td{padding:5px 2px} .h-pc{display:none} .h-mo{display:inline}
 }
 </style>
 </head>
 <body>
-<main>
-<h1>키워드 트래커 <span class="dim small">레딧 + 검색 관심도</span></h1>
+<main class="dash">
+<header class="dash-head">
+  <img class="brand-mark" src="/static/samurai-icon.png" alt="">
+  <div><h1>TREND SAMURAI</h1><p class="dash-sub">레딧 + 검색 관심도 키워드 트래커 · 2019년부터 월별</p></div>
+</header>
 
-<section class="card" id="add">
-  <h2>1. 키워드 추가</h2>
-  <div class="row">
-    <input type="text" id="kw" placeholder="예: blokees" style="flex:1">
-    <button class="main" id="btnSuggest">후보 찾기</button>
+<section class="panel" id="add">
+  <div class="filters">
+    <label class="search-box"><input type="text" id="kw" placeholder="키워드 추가 — 예: blokees"></label>
+    <button class="btn main" id="btnSuggest">후보 찾기</button>
   </div>
-  <div id="cand"></div>
+  <div id="cand" class="panel"></div>
+  <div class="filters"><div class="toggle-group" id="saved"></div><span class="small dim" id="savedNote">저장된 키워드 없음</span></div>
+  <div class="row small" id="cmpRow"></div>
 </section>
 
-<section class="card">
-  <h2>저장된 키워드</h2>
-  <div class="row" id="saved"><span class="dim">아직 없음</span></div>
-  <div class="row small dim" id="cmpRow" style="margin-top:8px"></div>
-</section>
-
-<section class="card" id="progress" style="display:none"></section>
-
+<section class="kpi-strip" id="kpis"></section>
+<section class="progress" id="progress"></section>
 <section id="result"></section>
+
+<footer class="notes">
+  <p><strong>하루 평균</strong> = 월 합계 ÷ 날짜 수. 진행 중인 달은 오늘까지 일수로 나눔. 자체 계산, 공식 수치 아님.</p>
+  <p><strong>검색 관심도</strong>는 0~100 지수. 같은 요청(같은 괄호) 안의 선끼리만 높이 비교 가능.</p>
+  <p><strong>출처</strong> arctic-shift(제3자 레딧 아카이브), Google Trends. 둘 다 비공식·무보증. 개인 리서치용.</p>
+</footer>
 </main>
 
 <script>
@@ -99,10 +146,10 @@ function chart(id,o){
   REG[id]={months,series};
   const lg=o.series.length>1?`<div class="legend">${o.series.map(s=>`<button class="lg ${hid.has(s.name)?'off':''}" data-chart="${id}" data-s="${esc(s.name)}"><i style="background:${s.color}"></i>${esc(s.name)}</button>`).join('')}</div>`:'';
   const empty=!series.some(s=>months.some(m=>s.pts[m]!=null));
-  return `<div class="card chart"><h3>${esc(o.title)}</h3><p class="desc">${o.desc}</p>${lg}
+  return `<section class="panel"><div class="panel-head"><h2>${esc(o.title)}</h2></div><p class="desc">${o.desc}</p>${lg}
    ${empty?'<div class="box dim">아직 받은 데이터가 없습니다. 수집되는 대로 표시됩니다.</div>':
-   `<div class="pc pcwrap">${pcSvg(id,months,series,o)}<div class="tip"></div></div><div class="mo">${moSvg(months,series,o)}</div>`}
-   <div class="foot"><span>${o.foot||''} 점선 = 진행 중인 달. 노란 점 = 최신 완료월.</span><span class="src">출처: ${esc(o.source)}</span></div></div>`;
+   `<div class="chart-box"><div class="pc pcwrap">${pcSvg(id,months,series,o)}<div class="tip"></div></div><div class="mo">${moSvg(months,series,o)}</div></div>`}
+   <div class="foot"><span>${o.foot||''} 점선 = 진행 중인 달. 노란 점 = 최신 완료월.</span><span class="src">출처: ${esc(o.source)}</span></div></section>`;
 }
 function maxOf(series,months){let mx=0;series.forEach(s=>months.forEach(m=>{const v=s.pts[m];if(v!=null&&v>mx)mx=v}));return mx}
 const PC={W:1100,H:440,L:66,R:44,T:30,B:44};
@@ -129,7 +176,7 @@ function pcSvg(id,months,series,o){
   order.forEach(i=>{const m=months[i];if(!(S.allLabels||(series.length<3&&i>=n-12)||m.endsWith('-12')||i===li))return;
     series.forEach(s=>{const v=s.pts[m];if(v==null)return;const t=fmt(v),w=t.length*8.4+6,x=Math.min(Math.max(X(i),L+w/2),W-w/2-2),y=Yv(v);
       for(const dy of [-11,22,-27,38]){const b=[x-w/2,y+dy-14,w,17];if(b[1]<2||b[1]+17>T+ph+2||boxes.some(o2=>hit(b,o2)))continue;boxes.push(b);
-        g+=`<text x="${x}" y="${y+dy}" text-anchor="middle" fill="${i===li?Y:s.color}" font-size="14" font-weight="${i===li?700:500}" paint-order="stroke" stroke="#161d25" stroke-width="4">${t}</text>`;break}})});
+        g+=`<text x="${x}" y="${y+dy}" text-anchor="middle" fill="${i===li?Y:s.color}" font-size="14" font-weight="${i===li?700:500}" paint-order="stroke" stroke="#151b22" stroke-width="4">${t}</text>`;break}})});
   if(ci>=0)g+=`<text x="${W-R}" y="${T-12}" text-anchor="end" fill="#9aa7b3" font-size="14">┄ ${o.cur} 진행 중</text>`;
   g+=`<line class="guide" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".35" style="display:none"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" data-id="${id}" role="img">${g}</svg>`;
@@ -143,7 +190,7 @@ function moSvg(months,series,o){
    <line x1="${x0}" x2="${x0}" y1="${top}" y2="${H-8}" stroke="#2a3540"/><line x1="${x0+pw}" x2="${x0+pw}" y1="${top}" y2="${H-8}" stroke="#2a3540" stroke-dasharray="2 4"/>`;
   series.forEach((s,j)=>g+=`<rect x="${W-tw+j*cw+cw/2-5}" y="14" width="10" height="10" fill="${s.color}"/>`);
   ms.forEach((m,i)=>{const jan=m.endsWith('-01');
-    if(i===li)g+=`<rect x="0" y="${top+i*rh}" width="${W}" height="${rh}" fill="#1b232c"/>`;
+    if(i===li)g+=`<rect x="0" y="${top+i*rh}" width="${W}" height="${rh}" fill="#1b232b"/>`;
     if(jan)g+=`<line x1="0" x2="${W}" y1="${top+(i+1)*rh}" y2="${top+(i+1)*rh}" stroke="#2a3540"/>`;
     g+=`<text x="2" y="${Yi(i)+4}" fill="${i===li?Y:jan||i===0?'#fff':'#9aa7b3'}" font-size="11">${m.slice(2)}${i===ci?'*':''}</text>`;
     series.forEach((s,j)=>{const v=s.pts[m];if(v!=null)g+=`<text x="${W-tw+(j+1)*cw-2}" y="${Yi(i)+4}" text-anchor="end" fill="${i===li?Y:s.color}" font-size="${k>4?9.5:11}" font-weight="${i===li?700:400}">${fmtS(v)}</text>`})});
@@ -189,32 +236,32 @@ function yearTable(d){
   const done=d.months.filter(m=>m!==d.cur_month),last=done[done.length-1],LY=+last.slice(0,4),LM=+last.slice(5);
   const years=[];for(let y=2019;y<=LY;y++)years.push(y);
   const rows=[];
-  ownSeries(d,1).forEach(s=>rows.push({label:`${s.name} 하루 평균 댓글 수`,short:'댓글/일',s}));
-  ownSeries(d,0).forEach(s=>rows.push({label:`${s.name} 하루 평균 글 수`,short:'글/일',s}));
-  mentionBySub(d).forEach(s=>rows.push({label:`언급 글 수 ${s.name} (월평균)`,short:'언급 '+s.name.replace('r/','').slice(0,6),s}));
-  trendSeries(d).filter(s=>s.isSum||d.variants.length===1).forEach(s=>rows.push({label:`검색 관심도 ${s.name} (월평균 지수)`,short:s.group.replace('·',' '),s}));
+  ownSeries(d,1).forEach(s=>rows.push({label:`${s.name} 댓글/일`,short:'댓글/일',s}));
+  ownSeries(d,0).forEach(s=>rows.push({label:`${s.name} 글/일`,short:'글/일',s}));
+  mentionBySub(d).forEach(s=>rows.push({label:`언급 ${s.name} (월평균)`,short:'언급 '+s.name.replace('r/','').slice(0,6),s}));
+  trendSeries(d).filter(s=>s.isSum||d.variants.length===1).forEach(s=>rows.push({label:`검색 ${s.group} (지수)`,short:s.group.replace('·',' '),s}));
   const pct=(a,b)=>a==null||b==null||b===0?'<td>–</td>':`<td class="${a>=b?'up':'down'}">${a>=b?'+':''}${((a/b-1)*100).toFixed(0)}%</td>`;
   const yy=y=>"'"+String(y).slice(2);
-  return `<div class="card"><h3>연간 요약</h3><p class="desc">완료된 달만 사용. ${LY}년은 1~${LM}월. 증감률 둘째 열은 전년 같은 기간(1~${LM}월)과 비교.</p>
-  <table><tr><th>지표</th>${years.map(y=>`<th><span class="h-pc">${y}${y===LY&&LM<12?` (1~${LM}월)`:''}</span><span class="h-mo">${yy(y)}</span></th>`).join('')}
-  <th><span class="h-pc">${LY-1} vs ${LY-2}</span><span class="h-mo">${yy(LY-1)}/${yy(LY-2)}</span></th><th><span class="h-pc">${LY} vs ${LY-1} 동기간</span><span class="h-mo">${yy(LY)}/${yy(LY-1)}</span></th></tr>
+  return `<section class="panel"><div class="panel-head"><h2>연간 요약</h2></div><p class="desc">단위는 지표 이름 참고(개/일, 개/월, 지수). 완료된 달만 사용. ${LY}년은 1~${LM}월. 증감률 둘째 열은 전년 같은 기간(1~${LM}월)과 비교.</p>
+  <div class="table-wrap"><table class="data-table"><thead><tr><th>지표</th>${years.map(y=>`<th><span class="h-pc">${y}</span><span class="h-mo">${yy(y)}</span></th>`).join('')}
+  <th><span class="h-pc">${LY-1} vs ${LY-2}</span><span class="h-mo">${yy(LY-1)}/${yy(LY-2)}</span></th><th><span class="h-pc">${LY} vs ${LY-1}</span><span class="h-mo">${yy(LY)}/${yy(LY-1)}</span></th></tr></thead><tbody>
   ${rows.map(r=>`<tr><td><span class="h-pc">${esc(r.label)}</span><span class="h-mo">${esc(r.short)}</span></td>${years.map(y=>`<td>${fmtS(yearAgg(r.s,d,y))||'–'}</td>`).join('')}${pct(yearAgg(r.s,d,LY-1),yearAgg(r.s,d,LY-2))}${pct(yearAgg(r.s,d,LY),yearAgg(r.s,d,LY-1,LM))}</tr>`).join('')}
-  </table><div class="foot"><span>자체 계산, 공식 수치 아님. '–' = 데이터 없음(서브레딧 생성 전 또는 미수집).</span><span class="src">출처: arctic-shift, Google Trends</span></div></div>`;
+  </tbody></table></div><div class="foot"><span>자체 계산, 공식 수치 아님. '–' = 데이터 없음(서브레딧 생성 전 또는 미수집). 빨강 = 증가, 파랑 = 감소.</span><span class="src">출처: arctic-shift, Google Trends</span></div></section>`;
 }
 
 /* ───── 탭별 화면 ───── */
 const FOOT_R='자체 계산, 공식 수치 아님(월 합계 ÷ 날짜 수). 아카이브 집계라 실제와 조금 다를 수 있음.';
 function viewOwn(d){
-  if(!Object.keys(d.own).length)return '<div class="card dim">전용 서브레딧을 고르지 않았습니다.</div>';
+  if(!Object.keys(d.own).length)return '<div class="box dim">전용 서브레딧을 고르지 않았습니다.</div>';
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:FOOT_R};
   return chart('own-c',{...o,title:'전용 서브레딧 · 하루 평균 댓글 수',desc:'단위: 개/일. 메인 지표. 서브레딧이 생기기 전 달은 표시하지 않음.',series:ownSeries(d,1)})
        + chart('own-p',{...o,title:'전용 서브레딧 · 하루 평균 글 수',desc:'단위: 개/일. 보조 지표(지워진 글·재업로드로 출렁일 수 있음).',series:ownSeries(d,0)});
 }
 function viewMention(d){
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift 글 검색',foot:'자체 계산, 공식 수치 아님. 변형별로 따로 세어 더함(한 글에 두 변형이 있으면 중복).'};
-  const cands=d.candidates.length?`<div class="box"><b>추천 서브레딧</b> <span class="dim small">(전용 서브레딧 활동 많은 사람들이 함께 활동하는 곳 · 숫자 = 겹친 사람 수)</span><div class="row" style="margin-top:6px">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.score}</span></label>`).join('')}</div></div>`:'';
-  return `<div class="card"><h3>언급을 볼 서브레딧</h3><div class="row" style="margin:8px 0">${d.subs.filter(s=>s.kind==='mention').map(s=>`<span class="ck" style="padding:5px 10px;border:1px solid var(--line)">r/${esc(s.name)} <a href="#" class="rmsub warn" data-s="${esc(s.name)}">✕</a></span>`).join('')||'<span class="dim">없음</span>'}</div>
-   ${cands}<div class="row"><input type="text" id="addSubs" placeholder="직접 추가: transformers, ActionFigures" style="flex:1"><button id="btnAddSubs">추가하고 수집</button></div></div>`
+  const cands=d.candidates.length?`<div class="box"><b>추천 서브레딧</b> <span class="dim small">(전용 서브레딧 활동 많은 사람들이 함께 활동하는 곳 · 숫자 = 겹친 사람 수)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.score}</span></label>`).join('')}</div></div>`:'';
+  return `<section class="panel"><div class="panel-head"><h2>언급을 볼 서브레딧</h2></div><div class="row">${d.subs.filter(s=>s.kind==='mention').map(s=>`<span class="chip">r/${esc(s.name)} <a href="#" class="rmsub warn" data-s="${esc(s.name)}">✕</a></span>`).join('')||'<span class="dim">없음</span>'}</div>
+   ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="직접 추가: transformers, ActionFigures"></label><button class="btn" id="btnAddSubs">추가하고 수집</button></div></section>`
    + mentionCharts(d,o);
 }
 function mentionCharts(d,o){
@@ -229,23 +276,33 @@ function viewTrend(d){
 }
 function viewCompare(){
   const ds=[...S.cmp].map(id=>S.cmpData[id]).filter(Boolean);
-  if(ds.length<2)return '<div class="card dim">위 "저장된 키워드"에서 비교할 키워드를 2개 이상 체크하세요.</div>';
+  if(ds.length<2)return '<div class="box dim">위 "저장된 키워드"에서 비교할 키워드를 2개 이상 체크하세요.</div>';
   const base=ds[0],mk=(f)=>ds.map((d,i)=>{const l=f(d),s=l.length>1&&l[0].name==='합계'?l[0]:l.length>1?sumSeries('',l,d.months):l[0]||{pts:{}};return{name:d.keyword,color:PAL[i%PAL.length],pts:s.pts}});
   const o={months:base.months,cur:base.cur_month,foot:'자체 계산, 공식 수치 아님.'};
   return chart('cmp-c',{...o,title:'키워드 비교 · 전용 서브레딧 하루 평균 댓글 수',desc:'단위: 개/일. 전용 서브레딧이 여럿이면 합계.',source:'arctic-shift',series:mk(d=>ownSeries(d,1))})
    + chart('cmp-p',{...o,title:'키워드 비교 · 전용 서브레딧 하루 평균 글 수',desc:'단위: 개/일.',source:'arctic-shift',series:mk(d=>ownSeries(d,0))})
    + chart('cmp-m',{...o,title:'키워드 비교 · 다른 서브레딧 언급 글 수',desc:'단위: 개/월. 키워드마다 고른 서브레딧이 다르면 단순 비교에 주의.',source:'arctic-shift 글 검색',series:mk(d=>mentionBySub(d))})
-   + '<div class="card dim small">검색 관심도는 키워드를 따로 요청해서 기준(0~100)이 서로 달라 비교 차트에서 뺐습니다.</div>';
+   + '<div class="box dim small">검색 관심도는 키워드를 따로 요청해서 기준(0~100)이 서로 달라 비교 차트에서 뺐습니다.</div>';
 }
 const TABS=[['own','전용 서브레딧'],['mention','다른 서브레딧 언급'],['trend','검색 관심도'],['year','연간 요약표'],['cmp','키워드 비교']];
 const VIEW={own:viewOwn,mention:viewMention,trend:viewTrend,year:yearTable,cmp:viewCompare};
+function kpis(d){
+  const lm=d.months[d.months.length-2],sum=l=>{const v=l.map(s=>s.pts[lm]).filter(v=>v!=null);return v.length?v.reduce((a,b)=>a+b,0):null};
+  const men=mentionBySub(d)[0],tr=trendSeries(d).filter(s=>s.group==='구글·미국'),t=tr.find(s=>s.isSum)||tr[0];
+  const k=(cls,label,v)=>`<div class="kpi ${cls}"><span class="kpi-label">${label}</span><strong class="kpi-num">${v}</strong></div>`;
+  return k('is-done','하루 평균 댓글 · '+lm,fmtS(sum(ownSeries(d,1)))||'–')+k('is-total','하루 평균 글',fmtS(sum(ownSeries(d,0)))||'–')
+    +k('is-todo','언급 글 수 · 월',men&&men.pts[lm]!=null?fmtS(men.pts[lm]):'–')+k('is-blue','구글 관심도 · 미국',t&&t.pts[lm]!=null?fmtS(t.pts[lm]):'–')
+    +k('is-blue','수집 진행',`<span id="kpiProg">${S.prog==null?'–':S.prog+'%'}</span>`);
+}
 function render(){
-  const d=S.data;if(!d){$('#result').innerHTML='';return}
-  $('#result').innerHTML=`<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(d.keyword)} <span class="dim small">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span></h2>
-   <div class="row"><button id="btnCsv">CSV</button><button id="btnHtml">HTML 리포트</button><button id="btnRefresh">지금 갱신</button><button id="btnDel" class="warn">삭제</button></div></div>
-   <div class="row" style="margin-top:10px">${TABS.map(([k,n])=>`<button class="tab ${S.tab===k?'on':''}" data-tab="${k}">${n}</button>`).join('')}</div>
-   <div class="row" style="margin-top:8px">${[['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']].map(([k,n])=>`<button class="rng ${S.range===k?'on':''}" data-r="${k}">${n}</button>`).join('')}
-   <button id="btnLabels" class="pc ${S.allLabels?'on':''}">모든 점 라벨</button></div></div>`+VIEW[S.tab](d);
+  const d=S.data;if(!d){$('#result').innerHTML='';$('#kpis').innerHTML='';return}
+  $('#kpis').innerHTML=kpis(d);
+  const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
+  $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span></div>
+   <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
+   <div class="filters">${tg([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}
+   <button id="btnLabels" class="btn pc ${S.allLabels?'main':''}">모든 점 라벨</button>
+   <button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">HTML 리포트</button><button class="btn" id="btnRefresh">지금 갱신</button><button class="btn warn" id="btnDel">삭제</button></div></section>`+VIEW[S.tab](d);
 }
 
 /* ───── 진행 패널 ───── */
@@ -253,11 +310,12 @@ let lastDone=-1;
 async function pollStatus(){
   if(S.kid){try{
     const s=await api('/api/status?kid='+S.kid),c=s.counts,done=c.done||0,total=Object.values(c).reduce((a,b)=>a+b,0),left=(c.queued||0)+(c.running||0);
-    const p=$('#progress');p.style.display=total?'':'none';
-    const cur=s.current?(s.current_kid===S.kid?s.current:'다른 키워드 수집 중 — '+s.current):left?'대기 중':'쉬는 중';
-    p.innerHTML=`<h2>2. 수집 진행</h2><div><b style="color:var(--y)">${left||s.current?'▶':'■'}</b> ${esc(cur)} ${s.cooldown>0?`<span class="warn">· 서버 과부하 응답으로 ${s.cooldown}초 쉬는 중</span>`:''}</div>
-     <div class="bar"><i style="width:${total?done/total*100:0}%"></i></div>
-     <div class="small dim">전체 ${total}개 중 완료 ${done} · 남음 ${left} · 보류 ${c.hold||0} · 실패 ${c.failed||0}</div>
+    const p=$('#progress');p.style.display=total?'':'none';S.prog=total?Math.round(done/total*100):null;const kp=$('#kpiProg');if(kp)kp.textContent=S.prog==null?'–':S.prog+'%';
+    const cur=s.current?(s.current_kid===S.kid?s.current:'다른 키워드 수집 중 — '+s.current):left?'대기 중':'수집 완료 · 쉬는 중';
+    const rest=total-done,dp=total?done/total*100:0;
+    p.innerHTML=`<div class="panel-head"><h2>수집 진행</h2><span class="count">${esc(cur)}${s.cooldown>0?` <span class="warn">· 서버 과부하 응답으로 ${s.cooldown}초 쉬는 중</span>`:''}</span></div>
+     <div class="progress-bar"><div class="progress-seg done" style="width:${dp}%">${dp>=12?`완료 ${done}`:''}</div><div class="progress-seg todo" style="width:${100-dp}%">${dp<=88?`남음 ${rest}`:''}</div></div>
+     <div class="progress-legend"><span><i class="swatch done"></i>완료 ${done}</span><span><i class="swatch todo"></i>남음 ${rest}</span><span>보류 ${c.hold||0} · 실패 ${c.failed||0}</span></div>
      ${s.holds.length?`<div class="box small"><b class="warn">보류·실패한 구간</b> <span class="dim">(다른 구간 먼저 진행, 나중에 자동 재시도)</span>${s.holds.map(h=>`<div>${h.sub?'r/'+esc(h.sub):'구글 트렌드'} ${h.term?`'${esc(h.term)}'`:''} ${h.first?`${h.first.slice(0,7)} ~ ${h.last.slice(0,7)}`:''} · ${h.n}개 · <span class="dim">${esc(h.msg||'')}</span>${h.next_at>s.now?` · ${Math.ceil((h.next_at-s.now)/60)}분 뒤 재시도`:''}</div>`).join('')}</div>`:''}`;
     if(done!==lastDone){lastDone=done;await loadData(false)}
   }catch(e){}}
@@ -269,7 +327,7 @@ async function loadData(force=true){
 }
 async function loadSaved(){
   const ks=await api('/api/keywords');
-  $('#saved').innerHTML=ks.length?ks.map(k=>`<button class="kwbtn ${k.id===S.kid?'on':''}" data-id="${k.id}">${esc(k.name)}</button>`).join(''):'<span class="dim">아직 없음</span>';
+  $('#saved').innerHTML=ks.map(k=>`<button class="toggle kwbtn ${k.id===S.kid?'on':''}" data-id="${k.id}">${esc(k.name)}</button>`).join('');$('#saved').style.display=ks.length?'':'none';$('#savedNote').textContent=ks.length?'저장된 키워드 · 눌러서 보기':'저장된 키워드 없음';
   $('#cmpRow').innerHTML=ks.length>1?'비교: '+ks.map(k=>`<label class="ck"><input type="checkbox" class="cmpck" value="${k.id}" ${S.cmp.has(k.id)?'checked':''}>${esc(k.name)}</label>`).join(''):'';
   if(!S.kid&&ks.length)select(ks[ks.length-1].id);
 }
@@ -277,17 +335,17 @@ async function select(id){S.kid=id;lastDone=-1;S.data=null;await loadData();load
 
 /* ───── 1단계: 후보 확인 ───── */
 $('#btnSuggest').onclick=async()=>{
-  const kw=$('#kw').value.trim();if(!kw)return;$('#cand').innerHTML='<p class="dim">찾는 중…</p>';
+  const kw=$('#kw').value.trim();if(!kw)return;$('#cand').innerHTML='<div class="box dim">찾는 중…</div>';
   try{const r=await api('/api/suggest',{body:{keyword:kw}});
     $('#cand').innerHTML=`<div class="box"><b>변형</b> <span class="dim small">체크한 것만 수집. 레딧 검색은 단어 단위라 단수·복수를 따로 찾습니다. 구글 트렌드는 최대 5개.</span>
-      <div class="row" style="margin:6px 0">${r.variants.map(v=>`<label class="ck"><input type="checkbox" class="vck" value="${esc(v)}" checked>${esc(v)}</label>`).join('')}</div>
-      <input type="text" id="vAdd" placeholder="변형 직접 추가(쉼표로 구분): 공식 영문명, 약칭 등" style="width:100%"></div>
+      <div class="row">${r.variants.map(v=>`<label class="ck"><input type="checkbox" class="vck" value="${esc(v)}" checked>${esc(v)}</label>`).join('')}</div>
+      <input type="text" id="vAdd" placeholder="변형 직접 추가(쉼표로 구분): 공식 영문명, 약칭 등" class="wide"></div>
      <div class="box"><b>전용 서브레딧</b> ${r.error?`<span class="warn small">${esc(r.error)} — 아래에 직접 입력하거나 다시 시도</span>`:''}
-      <div class="row" style="margin:6px 0">${r.subs.map(s=>`<label class="ck"><input type="checkbox" class="ock" value="${esc(s.name)}" ${s.exact?'checked':''}>r/${esc(s.name)} <span class="dim">구독 ${s.subscribers.toLocaleString()}${s.created_utc?' · '+new Date(s.created_utc*1000).toISOString().slice(0,7)+' 생성':''}</span></label>`).join('')||'<span class="dim">이름이 비슷한 서브레딧을 못 찾음</span>'}</div>
-      <input type="text" id="oAdd" placeholder="전용 서브레딧 직접 추가(쉼표로 구분)" style="width:100%"></div>
+      <div class="row">${r.subs.map(s=>`<label class="ck"><input type="checkbox" class="ock" value="${esc(s.name)}" ${s.exact?'checked':''}>r/${esc(s.name)} <span class="dim">구독 ${s.subscribers.toLocaleString()}${s.created_utc?' · '+new Date(s.created_utc*1000).toISOString().slice(0,7)+' 생성':''}</span></label>`).join('')||'<span class="dim">이름이 비슷한 서브레딧을 못 찾음</span>'}</div>
+      <input type="text" id="oAdd" placeholder="전용 서브레딧 직접 추가(쉼표로 구분)" class="wide"></div>
      <div class="box"><b>언급을 볼 다른 서브레딧</b> <span class="dim small">지금 비워 두고, 수집 시작 뒤 나오는 추천에서 골라도 됩니다.</span>
-      <input type="text" id="mAdd" placeholder="예: transformers, ActionFigures" style="width:100%;margin-top:6px"></div>
-     <button class="main" id="btnStart">수집 시작</button>`;
+      <input type="text" id="mAdd" placeholder="예: transformers, ActionFigures" class="wide"></div>
+     <button class="btn main" id="btnStart">수집 시작</button>`;
   }catch(e){$('#cand').innerHTML=`<p class="warn">${esc(e.message)}</p>`}
 };
 $('#kw').onkeydown=e=>{if(e.key==='Enter')$('#btnSuggest').click()};
@@ -317,9 +375,8 @@ function exportHtml(){
   const d=S.data,keep=S.tab;let body='';
   ['own','mention','trend','year'].forEach(k=>{S.tab=k;body+=k==='mention'?mentionCharts(d):VIEW[k](d)});S.tab=keep;render();
   const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.keyword)} 리포트</title>
-<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@400;500;700&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main>
-<h1>${esc(d.keyword)} <span class="dim small">레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</span></h1>${body}
-<p class="dim small">개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 자체 계산값은 공식 수치가 아닙니다.</p></main></body></html>`;
+<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1><p class="dash-sub">TREND SAMURAI · 레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</p></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
+<footer class="notes"><p>개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 <strong>자체 계산값은 공식 수치가 아닙니다.</strong></p></footer></main></body></html>`;
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=`${d.keyword}-report-${d.today}.html`;a.click();
 }
 loadSaved();pollStatus();

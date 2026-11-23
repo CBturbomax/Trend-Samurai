@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config as C
@@ -45,6 +46,9 @@ async def auth(request, call_next):
         if given is None or not secrets.compare_digest(given, PASSWORD):
             return Response("비밀번호 필요", 401, {"WWW-Authenticate": 'Basic realm="keyword-tracker"'})
     return await call_next(request)
+
+
+app.mount("/static", StaticFiles(directory=C.ROOT / "static"), name="static")
 
 
 @app.get("/")
