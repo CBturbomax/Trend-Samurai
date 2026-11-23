@@ -7,7 +7,7 @@ from . import config as C
 from .db import q, x
 from .sources import arctic, trends
 
-state = {"current": None, "cooldown_until": 0.0, "streak": 0, "last_call": 0.0,
+state = {"current": None, "cooldown_until": 0.0, "streak": 0, "next_ok": 0.0,
          "sub_streak": {}, "note": ""}
 ACTIVE = "('queued','running','hold')"
 
@@ -84,23 +84,23 @@ def daily_refresh():
 
 # ── arctic-shift 호출: 간격 지키기 + 실패 시 대기 ─────────────
 def call(fn, *a):
-    wait = max(state["cooldown_until"], state["last_call"] + C.ARCTIC_GAP) - time.time()
+    wait = max(state["cooldown_until"], state["next_ok"]) - time.time()
     if wait > 0:
-        state["note"] = f"대기 {int(wait)}초" if wait > C.ARCTIC_GAP else ""
         time.sleep(wait)
-    state["note"] = ""
     try:
         r = fn(*a)
         state["streak"] = 0
+        state["next_ok"] = time.time() + C.ARCTIC_GAP
         return r
     except arctic.SlowDown as e:
+        # 422는 1초 안에 거절되는 가벼운 응답. 실측상 2초 뒤 바로 다시 보내는 편이 훨씬 잘 됨.
+        # 그래도 계속 실패하면 15초→30초→…최대 10분으로 늘림.
         state["streak"] += 1
         n = state["streak"] - C.BACKOFF_FREE
-        w = e.wait or (5 if n <= 0 else min(C.BACKOFF_START * 2 ** (n - 1), C.BACKOFF_MAX))
+        w = e.wait or (C.FAST_RETRY if n <= 0 else min(C.BACKOFF_START * 2 ** (n - 1), C.BACKOFF_MAX))
         state["cooldown_until"] = time.time() + w
+        state["next_ok"] = 0
         raise
-    finally:
-        state["last_call"] = time.time()
 
 
 def _set(job, status, msg="", next_at=0.0, tries=None):
