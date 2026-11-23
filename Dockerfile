@@ -6,4 +6,5 @@ COPY app app
 COPY static static
 # DB는 /data 에 저장 → 호스팅 서비스에서 /data 에 볼륨(영구 디스크)을 붙일 것
 ENV KT_DB=/data/tracker.db
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# 주소(Networking)에 지정한 포트 8000 으로 고정
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
