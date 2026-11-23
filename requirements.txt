@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn>=0.29
+requests>=2.31
+pytrends==4.9.2
+APScheduler>=3.10
