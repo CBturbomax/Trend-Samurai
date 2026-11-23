@@ -67,6 +67,10 @@ def conn() -> sqlite3.Connection:
 
 def init():
     conn().executescript(SCHEMA)
+    try:  # 댓글 수를 마지막으로 받은 시각(키 없는 방식에서 영상별로 따로 받음)
+        conn().execute("ALTER TABLE yt_videos ADD COLUMN comments_at TEXT")
+    except sqlite3.OperationalError:
+        pass
     # 서버가 꺼질 때 돌던 작업은 다시 대기열로
     conn().execute("UPDATE jobs SET status='queued' WHERE status='running'")
 

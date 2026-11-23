@@ -266,7 +266,8 @@ def build(kid: int):
             glob["coverage"][kind] = datetime.fromtimestamp(int(c[0]["value"]), timezone.utc).strftime("%Y-%m-%d")
 
     # 유튜브
-    yt = {"enabled": bool(worker.yt_key()), "months": {}, "top": [], "snapshots": [], "total": 0, "capped": 0}
+    n_c = q("SELECT COUNT(*) n, SUM(comments_at IS NOT NULL) c FROM yt_videos WHERE keyword_id=?", (kid,))[0]
+    yt = {"enabled": True, "official": bool(worker.yt_key()), "with_comments": n_c["c"] or 0, "months": {}, "top": [], "snapshots": [], "total": 0, "capped": 0}
     covered = set()
     for r in q("SELECT start, end, status, capped FROM yt_windows WHERE keyword_id=?", (kid,)):
         if r["status"] != "split":

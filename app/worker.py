@@ -5,7 +5,7 @@ import time
 
 from . import config as C
 from .db import q, x
-from .sources import arctic, pullpush, trends, youtube
+from .sources import arctic, pullpush, trends, youtube, youtube_web
 
 state = {"current": None, "cooldown_until": 0.0, "streak": 0, "next_ok": 0.0,
          "sub_streak": {}, "note": "", "pp_next": 0.0, "pp_streak": 0}
@@ -66,17 +66,28 @@ def enqueue_keyword(kid, refresh=False):
         for kind in ("comment", "submission"):
             if (kind, m) not in done:
                 _add(kid, "global", 2, term=kind, month=m)
-    if yt_key():
+    if True:
         t0 = today()
-        wins = [(f"{y}-01-01", f"{y + 1}-01-01") for y in range(int(C.START_DATE[:4]), t0.year)]
-        wins += [month_bounds(f"{t0.year}-{mo:02d}") for mo in range(1, t0.month + 1)]
+        if yt_key():   # 공식 API: 지난 해는 1년 단위, 올해는 월 단위
+            wins = [(f"{y}-01-01", f"{y + 1}-01-01") for y in range(int(C.START_DATE[:4]), t0.year)]
+            wins += [month_bounds(f"{t0.year}-{mo:02d}") for mo in range(1, t0.month + 1)]
+        else:          # 키 없는 방식: 전부 월 단위, 최신 달부터
+            wins = [month_bounds(m) for m in reversed(all_months())]
         if refresh:  # 덜 끝난 기간(이번 달 등)은 다시 받음
             x("DELETE FROM yt_windows WHERE keyword_id=? AND status='open'", (kid,))
+            if not yt_key():  # 조회수는 계속 늘므로 최근 3개월 + 가장 오래전에 받은 6개 달을 매일 다시 받음
+                recent = all_months()[-3:]
+                old = [r["start"][:7] for r in q(
+                    "SELECT start FROM yt_windows WHERE keyword_id=? ORDER BY updated_at LIMIT 6", (kid,))]
+                for m in set(recent + old):
+                    x("DELETE FROM yt_windows WHERE keyword_id=? AND substr(start,1,7)=?", (kid, m))
         have = {(r["start"], r["end"]) for r in q("SELECT start, end FROM yt_windows WHERE keyword_id=?", (kid,))}
         for a, b in wins:
             if (a, b) not in have:
                 _add(kid, "yt", 2, month=a[:7], start=a, end=b)
         _add(kid, "ytstats", 2, month="0000-00")
+        if not yt_key():
+            _add(kid, "ytc", 4, month="0000-00")
     cur = all_months()[-1]
     for s in subs:
         if s["kind"] != "mention":
@@ -260,15 +271,17 @@ def _yt_fail(job, e):
         reset = (pt.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1, minutes=10)
                  + dt.timedelta(hours=8)).timestamp()
         x("UPDATE jobs SET next_at=?, msg='유튜브 하루 한도 소진 → 내일 이어서' "
-          "WHERE kind IN ('yt','ytstats') AND status IN ('queued','running')", (reset,))
+          "WHERE kind IN ('yt','ytstats','ytc') AND status IN ('queued','running')", (reset,))
         return _set(job, "queued", "유튜브 하루 한도 소진 → 내일 이어서", reset)
     if isinstance(e, youtube.KeyInvalid):
         x("UPDATE jobs SET status='hold', next_at=?, msg=? WHERE kind IN ('yt','ytstats') AND status='queued'",
           (time.time() + 86400, f"API 키 문제: {e}"[:150]))
         return _set(job, "hold", f"API 키 문제: {e}"[:150], time.time() + 86400)
     t = job["tries"] + 1
-    return _set(job, "hold" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150],
-                time.time() + (6 * 3600 if t >= 5 else 60 * 2 ** t), t)
+    wait = 6 * 3600 if t >= 5 else 60 * 2 ** t
+    x("UPDATE jobs SET next_at=? WHERE kind IN ('yt','ytc') AND status='queued' AND keyword_id=?",
+      (time.time() + min(wait, 1800), job["keyword_id"]))
+    return _set(job, "hold" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + wait, t)
 
 
 def _yt_store(kid, key, ids, terms):
@@ -279,15 +292,84 @@ def _yt_store(kid, key, ids, terms):
             if not any(t in v["text"] or t.replace(" ", "") in v["text"] for t in terms):
                 continue
             kept += 1
-            x("INSERT OR REPLACE INTO yt_videos VALUES(?,?,?,?,?,?,?,?,?)",
-              (kid, v["id"], v["published"], v["title"], v["channel"], v["views"], v["likes"], v["comments"], now_iso()))
+            x("INSERT OR REPLACE INTO yt_videos VALUES(?,?,?,?,?,?,?,?,?,?)",
+              (kid, v["id"], v["published"], v["title"], v["channel"], v["views"], v["likes"], v["comments"],
+               now_iso(), now_iso()))
     return kept
+
+
+def _ytw(fn, *a):
+    wait = state.get("ytw_next", 0) - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    try:
+        return fn(*a)
+    finally:
+        state["ytw_next"] = time.time() + C.YT_WEB_GAP
+
+
+def do_yt_web(job):
+    """키 없는 방식: 한 달 기간으로 검색해 영상 목록·조회수를 받음."""
+    kid = job["keyword_id"]
+    terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
+    b = dt.date.fromisoformat(job["end"])
+    found, capped = {}, 0
+    try:
+        for t in terms:
+            token, pages = None, 0
+            while True:
+                vids, token = _ytw(youtube_web.search_page, t, job["start"], job["end"], token)
+                pages += 1
+                for v in vids:   # 검색은 비슷한 단어도 끌고 오므로, 제목·설명·채널명에 키워드가 실제로 든 것만
+                    if any(k in v["text"] or k.replace(" ", "") in v["text"] for k in terms):
+                        found[v["id"]] = v
+                if not token or not vids:
+                    break
+                if pages >= C.YT_WEB_MAX_PAGES:
+                    capped = 1
+                    break
+    except youtube.YTError as e:
+        return _yt_fail(job, e)
+    x("BEGIN")
+    for v in found.values():   # 이미 있는 영상은 조회수만 갱신(댓글 수·정확한 게시일은 유지)
+        x("INSERT INTO yt_videos(keyword_id,video_id,published,title,channel,views,likes,comments,updated_at) "
+          "VALUES(?,?,?,?,?,?,0,0,?) ON CONFLICT(keyword_id,video_id) DO UPDATE SET "
+          "views=excluded.views, title=excluded.title, channel=excluded.channel, updated_at=excluded.updated_at",
+          (kid, v["id"], job["start"], v["title"], v["channel"], v["views"], now_iso()))
+    x("INSERT OR REPLACE INTO yt_windows VALUES(?,?,?,?,?,?,?)",
+      (kid, job["start"], job["end"], "done" if today() >= b else "open", len(found), capped, now_iso()))
+    x("COMMIT")
+    _set(job, "done")
+
+
+def do_ytc(job):
+    """키 없는 방식: 영상별 댓글 수·정확한 게시일을 조회수 많은 순으로 조금씩 받음."""
+    kid = job["keyword_id"]
+    stale = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=C.YT_COMMENT_STALE_DAYS)).isoformat(timespec="seconds")
+    rows = q("SELECT video_id FROM yt_videos WHERE keyword_id=? AND (comments_at IS NULL OR comments_at<?) "
+             "ORDER BY comments_at IS NOT NULL, views DESC LIMIT ?", (kid, stale, C.YT_COMMENT_BATCH))
+    try:
+        for r in rows:
+            d = _ytw(youtube_web.details, r["video_id"])
+            x("UPDATE yt_videos SET comments=?, views=IFNULL(?,views), published=IFNULL(?,published), comments_at=? "
+              "WHERE keyword_id=? AND video_id=?", (d["comments"], d["views"], d["published"], now_iso(), kid, r["video_id"]))
+    except youtube.YTError as e:
+        return _yt_fail(job, e)
+    _snapshot(kid)
+    _set(job, "done")
+    if len(rows) == C.YT_COMMENT_BATCH:   # 아직 남았으면 이어서
+        _add(kid, "ytc", 4, month="0000-00")
+
+
+def _snapshot(kid):
+    r = q("SELECT COUNT(*) n, IFNULL(SUM(views),0) v, IFNULL(SUM(comments),0) c FROM yt_videos WHERE keyword_id=?", (kid,))[0]
+    x("INSERT OR REPLACE INTO yt_snapshots VALUES(?,?,?,?,?)", (kid, today().isoformat(), r["n"], r["v"], r["c"]))
 
 
 def do_yt(job):
     kid, key = job["keyword_id"], yt_key()
     if not key:
-        return _set(job, "hold", "유튜브 API 키 없음", time.time() + 86400)
+        return do_yt_web(job)
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     a, b = dt.date.fromisoformat(job["start"]), dt.date.fromisoformat(job["end"])
     try:
@@ -320,8 +402,9 @@ def do_yt(job):
 def do_ytstats(job):
     """모든 영상의 조회수·댓글 수를 새로 받고, 오늘의 누적값을 기록."""
     kid, key = job["keyword_id"], yt_key()
-    if not key:
-        return _set(job, "hold", "유튜브 API 키 없음", time.time() + 86400)
+    if not key:   # 키 없는 방식에서는 검색 때 받은 조회수로 오늘 누적값만 기록
+        _snapshot(kid)
+        return _set(job, "done")
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     ids = [r["video_id"] for r in q("SELECT video_id FROM yt_videos WHERE keyword_id=?", (kid,))]
     try:
@@ -398,7 +481,7 @@ def do_global(job):
     _set(job, "done")
 
 
-HANDLERS = {"yt": do_yt, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+HANDLERS = {"yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
 def _next():
@@ -415,7 +498,9 @@ def describe(j):
         span = j["month"] if (j["start"], j["end"]) == month_bounds(j["month"]) else f"{j['start']}~{j['end']}"
         s = f"r/{j['sub']} '{j['term']}' {span} 언급 검색"
     elif j["kind"] == "yt":
-        s = f"유튜브 영상 검색 {j['start'][:7]} ~ {j['end'][:7]}"
+        s = f"유튜브 영상 검색 {j['start'][:7]}" + ("" if (j["start"], j["end"]) == month_bounds(j["start"][:7]) else f" ~ {j['end'][:7]}")
+    elif j["kind"] == "ytc":
+        s = "유튜브 댓글 수 받는 중"
     elif j["kind"] == "ytstats":
         s = "유튜브 조회수·댓글 수 갱신"
     elif j["kind"] == "global":
