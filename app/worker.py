@@ -50,11 +50,16 @@ def enqueue_keyword(kid, refresh=False):
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     subs = q("SELECT name,kind FROM subreddits WHERE keyword_id=?", (kid,))
     x("BEGIN")
+    # 최근 20시간 안에 받은 것은 다시 받지 않음(재시작할 때마다 구글 트렌드를 두드리면 429가 남)
+    fresh = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=20)).isoformat(timespec="seconds")
     for s in subs:
-        if s["kind"] == "own":
+        if s["kind"] == "own" and not q(
+                "SELECT 1 FROM sub_monthly WHERE sub=? AND updated_at>? LIMIT 1", (s["name"], fresh)):
             _add(kid, "totals", 0, sub=s["name"])
     for gprop, geo in C.TRENDS_COMBOS:
-        _add(kid, "trends", 1, gprop=gprop or "web", geo=geo or "WW")
+        g, r = gprop or "web", geo or "WW"
+        if not q("SELECT 1 FROM trends WHERE batch=? AND updated_at>? LIMIT 1", (f"{kid}:{g}:{r}", fresh)):
+            _add(kid, "trends", 1, gprop=g, geo=r)
     done = {(r["kind"], r["month"]) for r in q(
         "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
     for m in reversed(all_months() if C.PULLPUSH_ENABLED else []):
