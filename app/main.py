@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from . import config as C
 from . import db, variants, worker
 from .db import q, x
-from .sources import arctic
+from .sources import arctic, youtube
 
 
 @asynccontextmanager
@@ -143,7 +143,8 @@ def remove_sub(kid: int, sub: str):
 
 @app.delete("/api/keywords/{kid}")
 def delete_keyword(kid: int):
-    for t in ("variants", "subreddits", "candidates", "jobs", "global_counts", "global_months"):
+    for t in ("variants", "subreddits", "candidates", "jobs", "global_counts", "global_months",
+              "yt_videos", "yt_windows", "yt_snapshots"):
         x(f"DELETE FROM {t} WHERE keyword_id=?", (kid,))
     x("DELETE FROM trends WHERE batch LIKE ?", (f"{kid}:%",))
     x("DELETE FROM keywords WHERE id=?", (kid,))
@@ -159,6 +160,27 @@ def refresh(kid: int):
 @app.get("/api/keywords")
 def keywords():
     return [dict(r) for r in q("SELECT id,name FROM keywords ORDER BY id")]
+
+
+# ── 유튜브 API 키 등록 ─────────────────────────────────────
+class KeyIn(BaseModel):
+    key: str
+
+
+@app.post("/api/settings/youtube")
+def set_youtube_key(body: KeyIn):
+    key = body.key.strip()
+    try:
+        youtube.check_key(key)
+    except youtube.QuotaExceeded:
+        pass  # 키는 맞는데 오늘 한도만 다 쓴 경우
+    except Exception as e:
+        raise HTTPException(400, f"키 확인 실패: {e}")
+    x("INSERT OR REPLACE INTO meta VALUES('yt_key',?,?)", (key, time.time()))
+    x("UPDATE jobs SET status='queued', next_at=0, msg='' WHERE kind IN ('yt','ytstats') AND status='hold'")
+    for k in q("SELECT id FROM keywords"):
+        worker.enqueue_keyword(k["id"])
+    return {"ok": True}
 
 
 # ── 2) 진행 상황 ─────────────────────────────────────────
@@ -243,7 +265,31 @@ def build(kid: int):
         if c:
             glob["coverage"][kind] = datetime.fromtimestamp(int(c[0]["value"]), timezone.utc).strftime("%Y-%m-%d")
 
+    # 유튜브
+    yt = {"enabled": bool(worker.yt_key()), "months": {}, "top": [], "snapshots": [], "total": 0, "capped": 0}
+    covered = set()
+    for r in q("SELECT start, end, status, capped FROM yt_windows WHERE keyword_id=?", (kid,)):
+        if r["status"] != "split":
+            covered |= {m for m in months if r["start"][:7] <= m < r["end"][:7] or m == r["start"][:7]}
+            yt["capped"] += r["capped"]
+    agg = {r["m"]: r for r in q(
+        "SELECT substr(published,1,7) m, COUNT(*) n, SUM(views) v, SUM(comments) c, SUM(likes) l "
+        "FROM yt_videos WHERE keyword_id=? GROUP BY 1", (kid,))}
+    for m in sorted(covered):
+        r = agg.get(m)
+        yt["months"][m] = [r["n"], r["v"], r["c"]] if r else [0, 0, 0]
+    yt["top"] = [dict(r) for r in q(
+        "SELECT video_id, title, channel, published, views, comments, likes FROM yt_videos "
+        "WHERE keyword_id=? ORDER BY views DESC LIMIT 20", (kid,))]
+    yt["channels"] = [dict(r) for r in q(
+        "SELECT channel, COUNT(*) n, SUM(views) views FROM yt_videos WHERE keyword_id=? "
+        "GROUP BY channel ORDER BY views DESC LIMIT 10", (kid,))]
+    yt["snapshots"] = [dict(r) for r in q(
+        "SELECT day, videos, views, comments FROM yt_snapshots WHERE keyword_id=? ORDER BY day DESC LIMIT 60", (kid,))]
+    yt["total"] = q("SELECT COUNT(*) n FROM yt_videos WHERE keyword_id=?", (kid,))[0]["n"]
+
     return {
+        "youtube": yt,
         "global": glob,
         "id": kid, "keyword": k[0]["name"], "variants": terms, "months": months,
         "cur_month": months[-1], "days_elapsed": t.day, "today": t.isoformat(),
@@ -287,6 +333,12 @@ def export_csv(kid: int):
                         "레딧 전체, 변형 합산(중복 제거)"])
             w.writerow([d["keyword"], metric, "PullPush", "(전용 서브레딧 제외)", "", "", m, c["total"] - c["own"],
                         "", "", c["partial"], "레딧 전체에서 전용 서브레딧을 뺀 값"])
+    for m, (n, v, c) in sorted(d["youtube"]["months"].items()):
+        for metric, val, note in (("youtube_videos_uploaded", n, "그 달에 올라온 영상 수"),
+                                  ("youtube_views_of_uploads", v, "그 달에 올라온 영상의 현재 누적 조회수"),
+                                  ("youtube_comments_of_uploads", c, "그 달에 올라온 영상의 현재 누적 댓글 수")):
+            w.writerow([d["keyword"], metric, "YouTube Data API", "", "", "", m, val, "", "",
+                        int(m == d["cur_month"]), note])
     for s in d["trends"]:
         for m, (v, partial) in s["points"].items():
             w.writerow([d["keyword"], f"search_interest_{s['gprop']}", "Google Trends", "", s["term"],

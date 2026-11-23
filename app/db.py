@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS global_months(
   keyword_id INTEGER, kind TEXT, month TEXT, status TEXT,   -- done | open(아카이브가 이 달 중간까지만 있음)
   total INTEGER, updated_at TEXT, PRIMARY KEY(keyword_id, kind, month));
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT, updated_at REAL);
+CREATE TABLE IF NOT EXISTS yt_videos(
+  keyword_id INTEGER, video_id TEXT, published TEXT, title TEXT, channel TEXT,
+  views INTEGER, likes INTEGER, comments INTEGER, updated_at TEXT,
+  PRIMARY KEY(keyword_id, video_id));
+CREATE TABLE IF NOT EXISTS yt_windows(
+  keyword_id INTEGER, start TEXT, end TEXT, status TEXT,    -- done | open | split
+  n INTEGER, capped INTEGER DEFAULT 0, updated_at TEXT, PRIMARY KEY(keyword_id, start, end));
+CREATE TABLE IF NOT EXISTS yt_snapshots(                    -- 매일 기록하는 누적값 → 앞으로의 진짜 증가 추세
+  keyword_id INTEGER, day TEXT, videos INTEGER, views INTEGER, comments INTEGER,
+  PRIMARY KEY(keyword_id, day));
 CREATE TABLE IF NOT EXISTS jobs(
   id INTEGER PRIMARY KEY, keyword_id INTEGER, kind TEXT,   -- totals | trends | mention | discover
   sub TEXT, term TEXT, month TEXT, start TEXT, end TEXT, gprop TEXT, geo TEXT,

@@ -22,6 +22,9 @@ PULLPUSH_ENABLED = os.environ.get("KT_PULLPUSH", "") == "1"
 PULLPUSH_GAP = float(os.environ.get("KT_PULLPUSH_GAP", "7"))    # 레딧 전체 검색 요청 간격(초)
 PULLPUSH_BLOCK_WAIT = 300                                      # 429 뒤 쉬는 시간(초), 연속이면 2배씩 최대 1시간
 
+YT_API_KEY = os.environ.get("YT_API_KEY", "")                   # 없으면 화면에서 입력한 키(DB 저장)를 씀
+YT_MAX_PAGES = 10                                              # 검색 한 번에 최대 500개까지만 나옴 → 넘으면 기간을 쪼갬
+
 TRENDS_PROVIDER = os.environ.get("KT_TRENDS_PROVIDER", "pytrends")  # pytrends | serpapi
 SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 TRENDS_COMBOS = [("", "US"), ("youtube", "US"), ("", ""), ("youtube", "")]  # (gprop, geo)

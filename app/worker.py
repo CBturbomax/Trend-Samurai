@@ -5,7 +5,7 @@ import time
 
 from . import config as C
 from .db import q, x
-from .sources import arctic, pullpush, trends
+from .sources import arctic, pullpush, trends, youtube
 
 state = {"current": None, "cooldown_until": 0.0, "streak": 0, "next_ok": 0.0,
          "sub_streak": {}, "note": "", "pp_next": 0.0, "pp_streak": 0}
@@ -61,6 +61,17 @@ def enqueue_keyword(kid, refresh=False):
         for kind in ("comment", "submission"):
             if (kind, m) not in done:
                 _add(kid, "global", 2, term=kind, month=m)
+    if yt_key():
+        t0 = today()
+        wins = [(f"{y}-01-01", f"{y + 1}-01-01") for y in range(int(C.START_DATE[:4]), t0.year)]
+        wins += [month_bounds(f"{t0.year}-{mo:02d}") for mo in range(1, t0.month + 1)]
+        if refresh:  # 덜 끝난 기간(이번 달 등)은 다시 받음
+            x("DELETE FROM yt_windows WHERE keyword_id=? AND status='open'", (kid,))
+        have = {(r["start"], r["end"]) for r in q("SELECT start, end FROM yt_windows WHERE keyword_id=?", (kid,))}
+        for a, b in wins:
+            if (a, b) not in have:
+                _add(kid, "yt", 2, month=a[:7], start=a, end=b)
+        _add(kid, "ytstats", 2, month="0000-00")
     cur = all_months()[-1]
     for s in subs:
         if s["kind"] != "mention":
@@ -230,6 +241,93 @@ def do_discover(job):
     _set(job, "done")
 
 
+# ── 유튜브 ──────────────────────────────────────────────
+def yt_key():
+    if C.YT_API_KEY:
+        return C.YT_API_KEY
+    r = q("SELECT value FROM meta WHERE key='yt_key'")
+    return r[0]["value"] if r else ""
+
+
+def _yt_fail(job, e):
+    if isinstance(e, youtube.QuotaExceeded):   # 한도는 태평양 시간 자정에 초기화 → 그때까지 유튜브 작업만 미룸
+        pt = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=8)
+        reset = (pt.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1, minutes=10)
+                 + dt.timedelta(hours=8)).timestamp()
+        x("UPDATE jobs SET next_at=?, msg='유튜브 하루 한도 소진 → 내일 이어서' "
+          "WHERE kind IN ('yt','ytstats') AND status IN ('queued','running')", (reset,))
+        return _set(job, "queued", "유튜브 하루 한도 소진 → 내일 이어서", reset)
+    if isinstance(e, youtube.KeyInvalid):
+        x("UPDATE jobs SET status='hold', next_at=?, msg=? WHERE kind IN ('yt','ytstats') AND status='queued'",
+          (time.time() + 86400, f"API 키 문제: {e}"[:150]))
+        return _set(job, "hold", f"API 키 문제: {e}"[:150], time.time() + 86400)
+    t = job["tries"] + 1
+    return _set(job, "hold" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150],
+                time.time() + (6 * 3600 if t >= 5 else 60 * 2 ** t), t)
+
+
+def _yt_store(kid, key, ids, terms):
+    """통계를 받아 저장. 제목·설명·태그에 키워드가 실제로 든 영상만 남김."""
+    kept = 0
+    for i in range(0, len(ids), 50):
+        for v in youtube.videos(key, ids[i:i + 50]):
+            if not any(t in v["text"] or t.replace(" ", "") in v["text"] for t in terms):
+                continue
+            kept += 1
+            x("INSERT OR REPLACE INTO yt_videos VALUES(?,?,?,?,?,?,?,?,?)",
+              (kid, v["id"], v["published"], v["title"], v["channel"], v["views"], v["likes"], v["comments"], now_iso()))
+    return kept
+
+
+def do_yt(job):
+    kid, key = job["keyword_id"], yt_key()
+    if not key:
+        return _set(job, "hold", "유튜브 API 키 없음", time.time() + 86400)
+    terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
+    a, b = dt.date.fromisoformat(job["start"]), dt.date.fromisoformat(job["end"])
+    try:
+        ids, token, pages, capped = [], None, 0, 0
+        while True:
+            page, token = youtube.search(key, youtube.query_for(terms), job["start"], job["end"], token)
+            ids += page
+            pages += 1
+            if not token or not page:
+                break
+            if pages >= C.YT_MAX_PAGES:
+                if (b - a).days > 1:    # 500개를 넘김 → 기간을 반으로 나눠 다시
+                    mid = (a + dt.timedelta(days=(b - a).days // 2)).isoformat()
+                    x("INSERT OR REPLACE INTO yt_windows VALUES(?,?,?,?,?,?,?)",
+                      (kid, job["start"], job["end"], "split", None, 0, now_iso()))
+                    for s, e in ((job["start"], mid), (mid, job["end"])):
+                        _add(kid, "yt", 2, month=s[:7], start=s, end=e)
+                    return _set(job, "done", "500개 초과 → 기간을 나눔")
+                capped = 1
+                break
+        ids = list(dict.fromkeys(ids))
+        kept = _yt_store(kid, key, ids, terms)
+    except (youtube.QuotaExceeded, youtube.KeyInvalid, youtube.YTError) as e:
+        return _yt_fail(job, e)
+    x("INSERT OR REPLACE INTO yt_windows VALUES(?,?,?,?,?,?,?)",
+      (kid, job["start"], job["end"], "done" if today() >= b else "open", kept, capped, now_iso()))
+    _set(job, "done")
+
+
+def do_ytstats(job):
+    """모든 영상의 조회수·댓글 수를 새로 받고, 오늘의 누적값을 기록."""
+    kid, key = job["keyword_id"], yt_key()
+    if not key:
+        return _set(job, "hold", "유튜브 API 키 없음", time.time() + 86400)
+    terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
+    ids = [r["video_id"] for r in q("SELECT video_id FROM yt_videos WHERE keyword_id=?", (kid,))]
+    try:
+        _yt_store(kid, key, ids, terms)
+    except (youtube.QuotaExceeded, youtube.KeyInvalid, youtube.YTError) as e:
+        return _yt_fail(job, e)
+    r = q("SELECT COUNT(*) n, IFNULL(SUM(views),0) v, IFNULL(SUM(comments),0) c FROM yt_videos WHERE keyword_id=?", (kid,))[0]
+    x("INSERT OR REPLACE INTO yt_snapshots VALUES(?,?,?,?,?)", (kid, today().isoformat(), r["n"], r["v"], r["c"]))
+    _set(job, "done")
+
+
 # ── 레딧 전체 언급 (PullPush) ───────────────────────────────
 def _pp(fn, *a):
     wait = state["pp_next"] - time.time()
@@ -295,7 +393,7 @@ def do_global(job):
     _set(job, "done")
 
 
-HANDLERS = {"global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+HANDLERS = {"yt": do_yt, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
 def _next():
@@ -311,6 +409,10 @@ def describe(j):
     if j["kind"] == "mention":
         span = j["month"] if (j["start"], j["end"]) == month_bounds(j["month"]) else f"{j['start']}~{j['end']}"
         s = f"r/{j['sub']} '{j['term']}' {span} 언급 검색"
+    elif j["kind"] == "yt":
+        s = f"유튜브 영상 검색 {j['start'][:7]} ~ {j['end'][:7]}"
+    elif j["kind"] == "ytstats":
+        s = "유튜브 조회수·댓글 수 갱신"
     elif j["kind"] == "global":
         s = f"레딧 전체 {'글' if j['term'] == 'submission' else '댓글'} {j['month']} 검색"
     elif j["kind"] == "totals":
