@@ -168,7 +168,7 @@ function pcSvg(id,months,series,o){
     months.forEach((m,i)=>{const v=s.pts[m];if(v==null)return;
       if(i===li)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="6" fill="${Y}" stroke="#0f1419" stroke-width="2"/>`;
       else if(i===ci)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="3.5" fill="#0f1419" stroke="${s.color}" stroke-width="2"/>`;
-      else if(n<=40)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="2.6" fill="${s.color}"/>`});
+      else g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="${n<=40?3.2:2.4}" fill="${s.color}" stroke="#151b22" stroke-width="1"/>`});
   });
   /* 값 라벨: 기본은 최신 12개월 + 각 연말. 겹치면 위→아래→더 위 순으로 피하고, 자리가 없으면 생략 */
   const boxes=[],hit=(a,b)=>a[0]<b[0]+b[2]&&b[0]<a[0]+a[2]&&a[1]<b[1]+b[3]&&b[1]<a[1]+a[3];
@@ -183,23 +183,34 @@ function pcSvg(id,months,series,o){
 }
 /* 폰 전용: 세로로 긴 차트. 최신 달이 맨 위, 아래로 갈수록 과거. 값은 오른쪽 열에 표로 */
 function moSvg(months,series,o){
-  const f0=months.findIndex(m=>series.some(s=>s.pts[m]!=null));months=months.slice(Math.max(0,f0-1));const ms=[...months].reverse(),rh=18,top=34,W=360,L=46,k=series.length,cw=Math.max(27,Math.min(46,Math.floor(160/k))),tw=cw*k;
-  const x0=L+4,pw=W-L-tw-18,[ym]=nice(maxOf(series,months)),Xv=v=>x0+v/ym*pw,Yi=i=>top+i*rh+rh/2,H=top+ms.length*rh+8;
-  const ci=ms.indexOf(o.cur),li=ci>=0?ci+1:0;
-  let g=`<text x="${x0}" y="12" fill="#9aa7b3" font-size="10">0</text><text x="${x0+pw}" y="12" text-anchor="end" fill="#9aa7b3" font-size="10">${tick(ym)}</text>
-   <line x1="${x0}" x2="${x0}" y1="${top}" y2="${H-8}" stroke="#2a3540"/><line x1="${x0+pw}" x2="${x0+pw}" y1="${top}" y2="${H-8}" stroke="#2a3540" stroke-dasharray="2 4"/>`;
-  series.forEach((s,j)=>g+=`<rect x="${W-tw+j*cw+cw/2-5}" y="14" width="10" height="10" fill="${s.color}"/>`);
+  /* 폰 전용 세로 차트: 위가 과거, 맨 아래가 최신 달. 모든 지점에 점을 찍고,
+     선이 1~2개면 점 옆에 값을, 3개 이상이면 오른쪽 열에 값을 표로 적는다. */
+  const f0=months.findIndex(m=>series.some(s=>s.pts[m]!=null));const ms=months.slice(Math.max(0,f0-1));
+  const k=series.length,table=k>=3,rh=table?20:24,top=34,W=360,L=50,cw=table?Math.max(27,Math.min(46,Math.floor(160/k))):0,tw=cw*k;
+  const x0=L+4,pw=W-L-tw-(table?18:14),[ym]=nice(maxOf(series,ms)),Xv=v=>x0+v/ym*pw,Yi=i=>top+i*rh+rh/2,H=top+ms.length*rh+8;
+  const ci=ms.indexOf(o.cur),li=ci>=0?ci-1:ms.length-1;
+  let g=`<text x="${x0}" y="14" fill="#9aa7b3" font-size="11">0</text><text x="${x0+pw}" y="14" text-anchor="end" fill="#9aa7b3" font-size="11">${tick(ym)}</text>
+   <text x="${x0+pw/2}" y="14" text-anchor="middle" fill="#9aa7b3" font-size="11">${tick(ym/2)}</text>
+   <line x1="${x0}" x2="${x0}" y1="${top}" y2="${H-8}" stroke="#2a3540"/><line x1="${x0+pw/2}" x2="${x0+pw/2}" y1="${top}" y2="${H-8}" stroke="#2a3540" stroke-dasharray="2 4"/><line x1="${x0+pw}" x2="${x0+pw}" y1="${top}" y2="${H-8}" stroke="#2a3540" stroke-dasharray="2 4"/>`;
+  if(table)series.forEach((s,j)=>g+=`<rect x="${W-tw+j*cw+cw/2-5}" y="16" width="10" height="10" fill="${s.color}"/>`);
   ms.forEach((m,i)=>{const jan=m.endsWith('-01');
     if(i===li)g+=`<rect x="0" y="${top+i*rh}" width="${W}" height="${rh}" fill="#1b232b"/>`;
-    if(jan)g+=`<line x1="0" x2="${W}" y1="${top+(i+1)*rh}" y2="${top+(i+1)*rh}" stroke="#2a3540"/>`;
-    g+=`<text x="2" y="${Yi(i)+4}" fill="${i===li?Y:jan||i===0?'#fff':'#9aa7b3'}" font-size="11">${m.slice(2)}${i===ci?'*':''}</text>`;
-    series.forEach((s,j)=>{const v=s.pts[m];if(v!=null)g+=`<text x="${W-tw+(j+1)*cw-2}" y="${Yi(i)+4}" text-anchor="end" fill="${i===li?Y:s.color}" font-size="${k>4?9.5:11}" font-weight="${i===li?700:400}">${fmtS(v)}</text>`})});
+    if(jan&&i>0)g+=`<line x1="0" x2="${W}" y1="${top+i*rh}" y2="${top+i*rh}" stroke="#2a3540"/>`;
+    g+=`<text x="2" y="${Yi(i)+4}" fill="${i===li?Y:jan||i===ci?'#fff':'#9aa7b3'}" font-size="12" font-weight="${i===li||jan?700:400}">${m.slice(2)}${i===ci?'*':''}</text>`;
+    if(table)series.forEach((s,j)=>{const v=s.pts[m];if(v!=null)g+=`<text x="${W-tw+(j+1)*cw-2}" y="${Yi(i)+4}" text-anchor="end" fill="${i===li?Y:s.color}" font-size="${k>4?9.5:11}" font-weight="${i===li?700:400}">${fmtS(v)}</text>`})});
   series.forEach(s=>{let d='',pen=false;
     ms.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+Xv(v).toFixed(1)+' '+Yi(i);pen=true});
-    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="1.8"/>`;
-    if(ci>=0&&s.pts[o.cur]!=null&&s.pts[ms[ci+1]]!=null)g+=`<line x1="${Xv(s.pts[o.cur])}" y1="${Yi(ci)}" x2="${Xv(s.pts[ms[ci+1]])}" y2="${Yi(ci+1)}" stroke="${s.color}" stroke-width="1.8" stroke-dasharray="4 3"/>`;
-    const v=s.pts[ms[li]];if(v!=null)g+=`<circle cx="${Xv(v)}" cy="${Yi(li)}" r="4.5" fill="${Y}" stroke="#0f1419" stroke-width="1.5"/>`});
-  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg><div class="small dim">* 진행 중인 달 · 오른쪽 숫자는 범례 색 순서</div>`;
+    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    if(ci>0&&s.pts[o.cur]!=null&&s.pts[ms[ci-1]]!=null)g+=`<line x1="${Xv(s.pts[ms[ci-1]])}" y1="${Yi(ci-1)}" x2="${Xv(s.pts[o.cur])}" y2="${Yi(ci)}" stroke="${s.color}" stroke-width="2" stroke-dasharray="4 3"/>`});
+  /* 점 + 값 */
+  ms.forEach((m,i)=>{const row=series.map(s=>({s,v:s.pts[m]})).filter(r=>r.v!=null).sort((a,b)=>a.v-b.v);
+    row.forEach((r,j)=>{const x=Xv(r.v),y=Yi(i),c=r.s.color;
+      g+=i===li?`<circle cx="${x}" cy="${y}" r="5" fill="${Y}" stroke="#0f1419" stroke-width="1.5"/>`:i===ci?`<circle cx="${x}" cy="${y}" r="3.5" fill="#0f1419" stroke="${c}" stroke-width="2"/>`:`<circle cx="${x}" cy="${y}" r="3" fill="${c}" stroke="#151b22" stroke-width="1"/>`;
+      if(table)return;
+      const t=fmtS(r.v),w=t.length*7+4;let left=row.length===2?j===0:x+9+w>W-2;   // 두 선이면 작은 값은 왼쪽, 큰 값은 오른쪽에
+      if(left&&x-9-w<x0)left=false;if(!left&&x+9+w>W-2)left=true;
+      g+=`<text x="${left?x-9:x+9}" y="${y+4}" text-anchor="${left?'end':'start'}" fill="${i===li?Y:c}" font-size="12" font-weight="${i===li?700:500}" paint-order="stroke" stroke="${i===li?'#1b232b':'#151b22'}" stroke-width="3">${t}</text>`})});
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg><div class="small dim">위 = 과거, 아래 = 최신 · * 진행 중인 달${table?' · 오른쪽 숫자는 범례 색 순서':''}</div>`;
 }
 document.addEventListener('mousemove',e=>{const svg=e.target.closest&&e.target.closest('.pcwrap svg');if(!svg)return;
   const r=REG[svg.dataset.id],b=svg.getBoundingClientRect(),{W,L,R}=PC,n=r.months.length;
