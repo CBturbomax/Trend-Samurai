@@ -5,10 +5,10 @@ import time
 
 from . import config as C
 from .db import q, x
-from .sources import arctic, trends
+from .sources import arctic, pullpush, trends
 
 state = {"current": None, "cooldown_until": 0.0, "streak": 0, "next_ok": 0.0,
-         "sub_streak": {}, "note": ""}
+         "sub_streak": {}, "note": "", "pp_next": 0.0, "pp_streak": 0}
 ACTIVE = "('queued','running','hold')"
 
 
@@ -39,7 +39,8 @@ def _add(kid, kind, priority, **kw):
     cols = ["sub", "term", "month", "start", "end", "gprop", "geo"]
     where = " AND ".join(f"IFNULL({c},'')=?" for c in cols)
     vals = [kw.get(c) or "" for c in cols]
-    if q(f"SELECT 1 FROM jobs WHERE kind=? AND status IN {ACTIVE} AND {where} LIMIT 1", [kind] + vals):
+    own = "" if kind == "mention" else f" AND keyword_id={int(kid)}"
+    if q(f"SELECT 1 FROM jobs WHERE kind=? AND status IN {ACTIVE} AND {where}{own} LIMIT 1", [kind] + vals):
         return
     x(f"INSERT INTO jobs(keyword_id,kind,priority,{','.join(cols)}) VALUES(?,?,?,?,?,?,?,?,?,?)",
       [kid, kind, priority] + [kw.get(c) for c in cols])
@@ -54,6 +55,12 @@ def enqueue_keyword(kid, refresh=False):
             _add(kid, "totals", 0, sub=s["name"])
     for gprop, geo in C.TRENDS_COMBOS:
         _add(kid, "trends", 1, gprop=gprop or "web", geo=geo or "WW")
+    done = {(r["kind"], r["month"]) for r in q(
+        "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
+    for m in reversed(all_months()):
+        for kind in ("comment", "submission"):
+            if (kind, m) not in done:
+                _add(kid, "global", 2, term=kind, month=m)
     cur = all_months()[-1]
     for s in subs:
         if s["kind"] != "mention":
@@ -71,7 +78,7 @@ def enqueue_keyword(kid, refresh=False):
             for m in reversed(all_months()):
                 a, b = month_bounds(m)
                 if a not in have:
-                    _add(kid, "mention", 2, sub=s["name"], term=t, month=m, start=a, end=b)
+                    _add(kid, "mention", 3, sub=s["name"], term=t, month=m, start=a, end=b)
     if refresh:
         x("UPDATE jobs SET next_at=0 WHERE status='hold'")
     x("COMMIT")
@@ -118,7 +125,7 @@ def _split(job, why):
     mid = (a + dt.timedelta(days=(b - a).days // 2)).isoformat()
     _save_window(job, job["start"], job["end"], None, "split")
     for s, e in ((job["start"], mid), (mid, job["end"])):
-        _add(job["keyword_id"], "mention", 2, sub=job["sub"], term=job["term"],
+        _add(job["keyword_id"], "mention", 3, sub=job["sub"], term=job["term"],
              month=job["month"], start=s, end=e)
     _set(job, "done", why)
 
@@ -223,7 +230,72 @@ def do_discover(job):
     _set(job, "done")
 
 
-HANDLERS = {"totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+# ── 레딧 전체 언급 (PullPush) ───────────────────────────────
+def _pp(fn, *a):
+    wait = state["pp_next"] - time.time()
+    if wait > 0:
+        time.sleep(min(wait, C.PULLPUSH_GAP))
+    try:
+        r = fn(*a)
+        state["pp_streak"] = 0
+        return r
+    finally:
+        state["pp_next"] = time.time() + C.PULLPUSH_GAP
+
+
+def _coverage(kind):
+    """아카이브가 어디까지 들어와 있는지(epoch). 12시간마다 다시 확인."""
+    r = q("SELECT value, updated_at FROM meta WHERE key=?", (f"pp_cov_{kind}",))
+    if r and time.time() - r[0]["updated_at"] < 12 * 3600:
+        return int(r[0]["value"])
+    cov = _pp(pullpush.latest, kind)
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"pp_cov_{kind}", str(cov), time.time()))
+    return cov
+
+
+def _epoch(iso):
+    return int(dt.datetime.fromisoformat(iso).replace(tzinfo=dt.timezone.utc).timestamp())
+
+
+def do_global(job):
+    kid, kind, m = job["keyword_id"], job["term"], job["month"]
+    a, b = (_epoch(d) for d in month_bounds(m))
+    terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
+    try:
+        cov = _coverage(kind)
+        if cov < a:
+            return _set(job, "done", "아카이브에 아직 없는 달")
+        seen, subs = set(), {}
+        for t in terms:                      # 변형마다 검색하고, 같은 글·댓글은 한 번만 셈
+            after = a - 1
+            while True:
+                page = _pp(pullpush.search, kind, t, after, b)
+                new = [p for p in page if p[0] not in seen]
+                for pid, _, sub in new:
+                    seen.add(pid)
+                    subs[sub] = subs.get(sub, 0) + 1
+                if len(page) < 100:
+                    break
+                after = page[-1][1] - 1 if new else page[-1][1]
+    except arctic.BadRequest as e:
+        return _set(job, "failed", str(e)[:150])
+    except arctic.SlowDown as e:
+        # 막힌 동안 계속 두드리면 더 오래 막힘 → 레딧 전체 검색 작업을 통째로 미루고 다른 작업 진행
+        state["pp_streak"] += 1
+        wait = min(C.PULLPUSH_BLOCK_WAIT * 2 ** (state["pp_streak"] - 1), 3600)
+        x("UPDATE jobs SET next_at=? WHERE kind='global' AND status IN ('queued','running')", (time.time() + wait,))
+        return _set(job, "queued", f"{e} · {int(wait/60)}분 쉬고 재시도 {job['tries']+1}회", time.time() + wait, job["tries"] + 1)
+    x("BEGIN")
+    x("DELETE FROM global_counts WHERE keyword_id=? AND kind=? AND month=?", (kid, kind, m))
+    for sub, n in subs.items():
+        x("INSERT INTO global_counts VALUES(?,?,?,?,?)", (kid, kind, m, sub, n))
+    x("INSERT OR REPLACE INTO global_months VALUES(?,?,?,?,?,?)",
+      (kid, kind, m, "done" if cov >= b else "open", len(seen), now_iso()))
+    x("COMMIT")
+    _set(job, "done")
+
+
+HANDLERS = {"global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
 def _next():
@@ -239,6 +311,8 @@ def describe(j):
     if j["kind"] == "mention":
         span = j["month"] if (j["start"], j["end"]) == month_bounds(j["month"]) else f"{j['start']}~{j['end']}"
         s = f"r/{j['sub']} '{j['term']}' {span} 언급 검색"
+    elif j["kind"] == "global":
+        s = f"레딧 전체 {'글' if j['term'] == 'submission' else '댓글'} {j['month']} 검색"
     elif j["kind"] == "totals":
         s = f"r/{j['sub']} 월별 총계"
     elif j["kind"] == "trends":

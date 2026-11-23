@@ -1,5 +1,6 @@
 import base64
 import calendar
+from datetime import datetime, timezone
 import csv
 import io
 import os
@@ -22,6 +23,8 @@ from .sources import arctic
 @asynccontextmanager
 async def lifespan(app):
     db.init()
+    for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
+        worker.enqueue_keyword(k["id"])
     worker.start()
     sched = BackgroundScheduler()
     sched.add_job(worker.daily_refresh, "cron", hour=C.DAILY_HOUR, minute=10)
@@ -138,7 +141,7 @@ def remove_sub(kid: int, sub: str):
 
 @app.delete("/api/keywords/{kid}")
 def delete_keyword(kid: int):
-    for t in ("variants", "subreddits", "candidates", "jobs"):
+    for t in ("variants", "subreddits", "candidates", "jobs", "global_counts", "global_months"):
         x(f"DELETE FROM {t} WHERE keyword_id=?", (kid,))
     x("DELETE FROM trends WHERE batch LIKE ?", (f"{kid}:%",))
     x("DELETE FROM keywords WHERE id=?", (kid,))
@@ -214,7 +217,28 @@ def build(kid: int):
     trends = [{"gprop": g, "geo": geo, "term": term, "points": pts}
               for (g, geo, term), pts in tr.items() if term in terms]
 
+    # 레딧 전체 언급
+    own_names = {s["name"].lower() for s in subs if s["kind"] == "own"}
+    glob = {"submission": {}, "comment": {}, "coverage": {}, "top_subs": []}
+    for r in q("SELECT kind, month, status, total FROM global_months WHERE keyword_id=?", (kid,)):
+        glob[r["kind"]][r["month"]] = {"total": r["total"], "own": 0, "partial": int(r["status"] != "done")}
+    top = {}
+    recent = set(months[-14:])
+    for r in q("SELECT kind, month, sub, count FROM global_counts WHERE keyword_id=?", (kid,)):
+        cell = glob[r["kind"]].get(r["month"])
+        if cell and r["sub"].lower() in own_names:
+            cell["own"] += r["count"]
+        if r["month"] in recent:
+            row = top.setdefault(r["sub"], {"sub": r["sub"], "submission": 0, "comment": 0})
+            row[r["kind"]] += r["count"]
+    glob["top_subs"] = sorted(top.values(), key=lambda v: -(v["submission"] + v["comment"]))[:20]
+    for kind in ("submission", "comment"):
+        c = q("SELECT value FROM meta WHERE key=?", (f"pp_cov_{kind}",))
+        if c:
+            glob["coverage"][kind] = datetime.fromtimestamp(int(c[0]["value"]), timezone.utc).strftime("%Y-%m-%d")
+
     return {
+        "global": glob,
         "id": kid, "keyword": k[0]["name"], "variants": terms, "months": months,
         "cur_month": months[-1], "days_elapsed": t.day, "today": t.isoformat(),
         "own": own, "mentions": mentions, "trends": trends,
@@ -251,6 +275,12 @@ def export_csv(kid: int):
             for term, v in by.items():
                 w.writerow([d["keyword"], "mention_posts", "arctic-shift", sub, term, "", m, v, days(m),
                             round(v / days(m), 3), int(m == d["cur_month"]), "제목에 단어 포함된 글"])
+    for kind, metric in (("comment", "reddit_wide_mention_comments"), ("submission", "reddit_wide_mention_posts")):
+        for m, c in sorted(d["global"][kind].items()):
+            w.writerow([d["keyword"], metric, "PullPush", "(전체)", "", "", m, c["total"], "", "", c["partial"],
+                        "레딧 전체, 변형 합산(중복 제거)"])
+            w.writerow([d["keyword"], metric, "PullPush", "(전용 서브레딧 제외)", "", "", m, c["total"] - c["own"],
+                        "", "", c["partial"], "레딧 전체에서 전용 서브레딧을 뺀 값"])
     for s in d["trends"]:
         for m, (v, partial) in s["points"].items():
             w.writerow([d["keyword"], f"search_interest_{s['gprop']}", "Google Trends", "", s["term"],

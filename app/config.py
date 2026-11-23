@@ -16,6 +16,9 @@ TRIES_BEFORE_SHRINK = 25                                       # 같은 창 재�
 MIN_WINDOW_DAYS = 8                                            # 이보다 짧으면 더 안 쪼개고 보류
 SUB_GIVEUP_STREAK = 90                                         # 한 서브레딧이 연속 이만큼 실패하면 통째 보류
 
+PULLPUSH_GAP = float(os.environ.get("KT_PULLPUSH_GAP", "7"))    # 레딧 전체 검색 요청 간격(초)
+PULLPUSH_BLOCK_WAIT = 300                                      # 429 뒤 쉬는 시간(초), 연속이면 2배씩 최대 1시간
+
 TRENDS_PROVIDER = os.environ.get("KT_TRENDS_PROVIDER", "pytrends")  # pytrends | serpapi
 SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 TRENDS_COMBOS = [("", "US"), ("youtube", "US"), ("", ""), ("youtube", "")]  # (gprop, geo)

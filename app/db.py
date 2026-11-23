@@ -27,6 +27,13 @@ CREATE TABLE IF NOT EXISTS trends(
   batch TEXT, term TEXT, gprop TEXT, geo TEXT, month TEXT,
   value REAL, partial INTEGER, adjusted INTEGER DEFAULT 0, updated_at TEXT,
   PRIMARY KEY(batch, term, month));
+CREATE TABLE IF NOT EXISTS global_counts(             -- 레딧 전체 언급: 서브레딧별 건수
+  keyword_id INTEGER, kind TEXT, month TEXT, sub TEXT, count INTEGER,
+  PRIMARY KEY(keyword_id, kind, month, sub));
+CREATE TABLE IF NOT EXISTS global_months(
+  keyword_id INTEGER, kind TEXT, month TEXT, status TEXT,   -- done | open(아카이브가 이 달 중간까지만 있음)
+  total INTEGER, updated_at TEXT, PRIMARY KEY(keyword_id, kind, month));
+CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT, updated_at REAL);
 CREATE TABLE IF NOT EXISTS jobs(
   id INTEGER PRIMARY KEY, keyword_id INTEGER, kind TEXT,   -- totals | trends | mention | discover
   sub TEXT, term TEXT, month TEXT, start TEXT, end TEXT, gprop TEXT, geo TEXT,
