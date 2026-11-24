@@ -122,7 +122,8 @@ def enqueue_keyword(kid, refresh=False):
                 else:
                     for m in reversed(missing):
                         a, b = month_bounds(m)
-                        _add(kid, "mention", 3, sub=s["name"], term=t, month=m, start=a, end=b)
+                        _add(kid, "mention", 5 if t.startswith(CPFX) else 3,   # 댓글은 글 검색이 다 끝난 뒤
+                             sub=s["name"], term=t, month=m, start=a, end=b)
     if refresh:
         x("UPDATE jobs SET next_at=0 WHERE status='hold'")
     x("COMMIT")
