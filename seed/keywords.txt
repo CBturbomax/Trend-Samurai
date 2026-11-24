@@ -119,3 +119,7 @@ casio                 # 카시오 6952
 seiko                 # 세이코 8050
 citizen watch         # 시티즌 7762 (citizen만 쓰면 일반 단어라 레딧 잡음이 커서 watch 붙임)
 aritzia               # 아리치아 ATZ.TO
+
+# DJ 장비
+pioneer dj            # AlphaTheta (노리츠코키 7744.T 자회사)
+alphatheta            # 노리츠코키 7744.T
