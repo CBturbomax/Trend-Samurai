@@ -1,0 +1,41 @@
+# 서버 시작 때 자동으로 추가되는 키워드 (한 줄에 하나, # 뒤는 메모)
+# 화면에서 지운 키워드는 다시 생기지 않음
+
+# K뷰티
+wellage
+centellian24          # 동국제약 마데카
+beauty of joseon      # 조선미녀
+iope
+dr althea
+sulwhasoo
+biodance
+
+# K푸드
+bibigo
+kimbap
+korean street food
+
+# 러닝화
+hoka
+saucony
+on running
+brooks running
+
+# 완구·수집품
+jellycat
+funko
+52toys
+squishies
+sonny angel
+
+# 애슬레저·패션
+skims
+sweaty betty
+athleta
+alo yoga
+figs scrubs
+
+# 글로벌 색조
+elf cosmetics
+mcobeauty
+catrice

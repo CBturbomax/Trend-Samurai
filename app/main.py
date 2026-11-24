@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config as C
-from . import db, variants, worker
+from . import db, seed, variants, worker
 from .db import q, x
 from .sources import arctic, youtube
 
@@ -23,6 +23,7 @@ from .sources import arctic, youtube
 @asynccontextmanager
 async def lifespan(app):
     db.init()
+    seed.load()   # seed/ 폴더의 키워드·틱톡 과거 추이를 채움
     if not C.PULLPUSH_ENABLED:
         x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
     x("DELETE FROM jobs WHERE kind='mention' AND status='queued' AND julianday(end)-julianday(start)<300")
@@ -162,7 +163,7 @@ def remove_sub(kid: int, sub: str):
 @app.delete("/api/keywords/{kid}")
 def delete_keyword(kid: int):
     for t in ("variants", "subreddits", "candidates", "jobs", "global_counts", "global_months",
-              "yt_videos", "yt_windows", "yt_snapshots", "tt_snapshots"):
+              "yt_videos", "yt_windows", "yt_snapshots", "tt_snapshots", "tt_history"):
         x(f"DELETE FROM {t} WHERE keyword_id=?", (kid,))
     x("DELETE FROM trends WHERE batch LIKE ?", (f"{kid}:%",))
     x("DELETE FROM keywords WHERE id=?", (kid,))

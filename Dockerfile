@@ -8,6 +8,7 @@ ENV KT_CHROMIUM=/usr/bin/chromium
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app app
 COPY static static
+COPY seed seed
 # DB는 /data 에 저장 → 호스팅 서비스에서 /data 에 볼륨(영구 디스크)을 붙일 것
 ENV KT_DB=/data/tracker.db
 # 주소(Networking)에 지정한 포트 8000 으로 고정
