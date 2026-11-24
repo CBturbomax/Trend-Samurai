@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS yt_windows(
 CREATE TABLE IF NOT EXISTS yt_snapshots(                    -- 매일 기록하는 누적값 → 앞으로의 진짜 증가 추세
   keyword_id INTEGER, day TEXT, videos INTEGER, views INTEGER, comments INTEGER,
   PRIMARY KEY(keyword_id, day));
+CREATE TABLE IF NOT EXISTS tt_snapshots(                    -- 틱톡 해시태그 누적값(매일 기록)
+  keyword_id INTEGER, tag TEXT, day TEXT, videos INTEGER, views INTEGER,
+  PRIMARY KEY(keyword_id, tag, day));
 CREATE TABLE IF NOT EXISTS jobs(
   id INTEGER PRIMARY KEY, keyword_id INTEGER, kind TEXT,   -- totals | trends | mention | discover
   sub TEXT, term TEXT, month TEXT, start TEXT, end TEXT, gprop TEXT, geo TEXT,

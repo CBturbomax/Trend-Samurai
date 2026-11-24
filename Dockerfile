@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && playwright install --with-deps chromium   # 틱톡 해시태그 통계용 브라우저
 COPY app app
 COPY static static
 # DB는 /data 에 저장 → 호스팅 서비스에서 /data 에 볼륨(영구 디스크)을 붙일 것

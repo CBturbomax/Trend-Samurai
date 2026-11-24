@@ -123,8 +123,9 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 <footer class="notes">
   <p><strong>월 합계</strong>가 기본. <strong>하루 평균</strong>으로 바꾸면 월 합계 ÷ 날짜 수(진행 중인 달은 오늘까지 일수)로 보여 줌. 자체 계산, 공식 수치 아님.</p>
   <p><strong>검색 관심도</strong>는 0~100 지수. 같은 차트 안의 선끼리만 높이 비교 가능. <strong>미국 | 전세계</strong> 버튼은 구글·유튜브 검색 관심도에 적용(레딧 글·유튜브 영상 수는 지역 구분이 없는 전세계 값).</p>
-    <p><strong>유튜브</strong> 과거 달의 조회수·댓글은 '그 달에 올라온 영상의 현재 누적값'. 실제 증가 추세는 매일 기록하는 누적값으로 봄.</p>
-  <p><strong>출처</strong> arctic-shift(제3자 레딧 아카이브, 비공식), Google Trends(비공식), YouTube 검색(비공식). 개인 리서치용.</p>
+    <p><strong>틱톡</strong>은 해시태그의 누적 게시물 수·조회수만 받을 수 있어, 매일 기록한 값의 차이로 추세를 봄.</p>
+  <p><strong>유튜브</strong> 과거 달의 조회수·댓글은 '그 달에 올라온 영상의 현재 누적값'. 실제 증가 추세는 매일 기록하는 누적값으로 봄.</p>
+  <p><strong>출처</strong> arctic-shift(제3자 레딧 아카이브, 비공식), Google Trends(비공식), YouTube 검색(비공식), TikTok 해시태그 페이지(비공식). 개인 리서치용.</p>
 </footer>
 </main>
 
@@ -341,6 +342,20 @@ function mentionCharts(d,o){
 }
 function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+viewOwn(d)+viewMention(d)}
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
+function viewTiktok(d){
+  const tags=d.tiktok||[];
+  if(!tags.length)return '<div class="box dim">아직 받은 틱톡 데이터가 없습니다. 하루에 한 번 해시태그 통계를 기록합니다.</div>';
+  const big=n=>n.toLocaleString();
+  return tags.map(t=>{const r=t.rows,now=r[0],first=r[r.length-1],days=r.length;
+    return `<section class="panel"><div class="panel-head"><h2>틱톡 · #${esc(t.tag)}</h2><span class="count">기준일 ${now.day} · 기록 ${days}일째</span></div>
+     <div class="kpi-strip" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+       <div class="kpi is-done"><span class="kpi-label">게시물 수 (누적)</span><strong class="kpi-num">${fmtS(now.videos)}</strong><span class="small dim">${big(now.videos)}개</span></div>
+       <div class="kpi is-total"><span class="kpi-label">조회수 (누적)</span><strong class="kpi-num">${fmtS(now.views)}</strong><span class="small dim">${big(now.views)}회</span></div>
+       <div class="kpi is-todo"><span class="kpi-label">기록 시작 후 늘어난 게시물</span><strong class="kpi-num">${days>1?'+'+fmtS(now.videos-first.videos):'–'}</strong><span class="small dim">${days>1?first.day+' 이후':'내일부터 표시'}</span></div>
+     </div>
+     <div class="table-wrap"><table class="data-table"><thead><tr><th>날짜</th><th>게시물 수</th><th>전날 대비</th><th>조회수</th><th>전날 대비</th></tr></thead><tbody>${r.slice(0,30).map((x,i)=>{const p=r[i+1],dv=p?x.videos-p.videos:null,dw=p?x.views-p.views:null;return `<tr><td>${x.day}</td><td>${big(x.videos)}</td><td class="${dv>0?'up':dv<0?'down':''}">${dv==null?'–':(dv>=0?'+':'')+big(dv)}</td><td>${big(x.views)}</td><td class="${dw>0?'up':dw<0?'down':''}">${dw==null?'–':(dw>=0?'+':'')+big(dw)}</td></tr>`}).join('')}</tbody></table></div>
+     <div class="foot"><span>틱톡은 과거 추이를 주지 않아, 오늘부터 하루 한 번 누적값을 기록해 추세를 만듦. 전세계 합계(지역 구분 없음).</span><span class="src">출처: TikTok 해시태그 페이지 (비공식)</span></div></section>`}).join('');
+}
 function viewGoogle(d){return trendChart(d,'web')}
 function viewCompare(){
   const ds=[...S.cmp].map(id=>S.cmpData[id]).filter(Boolean);
@@ -352,8 +367,8 @@ function viewCompare(){
    + chart('cmp-m',{...o,title:'키워드 비교 · 다른 서브레딧 언급 글 수',desc:'단위: 개/월. 키워드마다 고른 서브레딧이 다르면 단순 비교에 주의.',source:'arctic-shift 글 검색',series:mk(d=>mentionBySub(d))})
    + '<div class="box dim small">검색 관심도는 키워드를 따로 요청해서 기준(0~100)이 서로 달라 비교 차트에서 뺐습니다.</div>';
 }
-const TABS=[['reddit','레딧'],['yt','유튜브'],['google','구글'],['year','요약표'],['cmp','키워드 비교']];
-const VIEW={reddit:viewReddit,yt:viewYT,google:viewGoogle,year:yearTable,cmp:viewCompare};
+const TABS=[['reddit','레딧'],['yt','유튜브'],['tiktok','틱톡'],['google','구글'],['year','요약표'],['cmp','키워드 비교']];
+const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,year:yearTable,cmp:viewCompare};
 function kpis(d){
   const lm=d.months[d.months.length-2],sum=l=>{const v=l.map(s=>s.pts[lm]).filter(v=>v!=null);return v.length?v.reduce((a,b)=>a+b,0):null};
   const k=(cls,label,v)=>`<div class="kpi ${cls}"><span class="kpi-label">${label}</span><strong class="kpi-num">${v}</strong></div>`;
@@ -446,7 +461,7 @@ document.addEventListener('change',async e=>{if(e.target.classList.contains('cmp
 /* ───── 내보내기: 차트 포함 단일 HTML ───── */
 function exportHtml(){
   const d=S.data,keep=S.tab;let body='';
-  body=(d.global&&d.global.enabled?viewGlobal(d):'')+viewOwn(d)+mentionCharts(d)+viewYT(d)+viewGoogle(d)+yearTable(d);
+  body=(d.global&&d.global.enabled?viewGlobal(d):'')+viewOwn(d)+mentionCharts(d)+viewYT(d)+viewTiktok(d)+viewGoogle(d)+yearTable(d);
   const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.keyword)} 리포트</title>
 <link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1><p class="dash-sub">Trend Samurai by CB · 레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</p></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
 <footer class="notes"><p>개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 <strong>자체 계산값은 공식 수치가 아닙니다.</strong></p></footer></main></body></html>`;

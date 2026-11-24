@@ -5,7 +5,7 @@ import time
 
 from . import config as C
 from .db import q, x
-from .sources import arctic, pullpush, trends, youtube, youtube_web
+from .sources import arctic, pullpush, tiktok, trends, youtube, youtube_web
 
 state = {"current": None, "cooldown_until": 0.0, "streak": 0, "next_ok": 0.0,
          "sub_streak": {}, "note": "", "pp_next": 0.0, "pp_streak": 0}
@@ -66,6 +66,9 @@ def enqueue_keyword(kid, refresh=False):
         for kind in ("comment", "submission"):
             if (kind, m) not in done:
                 _add(kid, "global", 2, term=kind, month=m)
+    # 틱톡: 오늘 기록이 없으면 받음
+    if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
+        _add(kid, "tiktok", 1)
     if True:
         t0 = today()
         if yt_key():   # 공식 API: 지난 해는 1년 단위, 올해는 월 단위
@@ -258,6 +261,23 @@ def do_discover(job):
     for sub, sc in sorted(score.items(), key=lambda kv: -kv[1])[:15]:
         x("INSERT OR REPLACE INTO candidates VALUES(?,?,?)", (kid, sub, sc))
     _set(job, "done")
+
+
+# ── 틱톡 ──────────────────────────────────────────────
+def do_tiktok(job):
+    kid = job["keyword_id"]
+    tags = list(dict.fromkeys(filter(None, (tiktok.tag_for(r["term"]) for r in q(
+        "SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))))))
+    try:
+        stats = tiktok.hashtag_stats(tags)
+    except tiktok.TikTokError as e:
+        t = job["tries"] + 1
+        wait = 1800 * t if t < 4 else 20 * 3600
+        return _set(job, "hold" if t >= 4 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + wait, t)
+    for tag, st in stats.items():
+        if st:
+            x("INSERT OR REPLACE INTO tt_snapshots VALUES(?,?,?,?,?)", (kid, tag, today().isoformat(), st["videos"], st["views"]))
+    _set(job, "done", "" if any(stats.values()) else "해시태그 없음")
 
 
 # ── 유튜브 ──────────────────────────────────────────────
@@ -484,7 +504,7 @@ def do_global(job):
     _set(job, "done")
 
 
-HANDLERS = {"yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
 def _next():
@@ -500,6 +520,8 @@ def describe(j):
     if j["kind"] == "mention":
         span = j["month"] if (j["start"], j["end"]) == month_bounds(j["month"]) else f"{j['start']}~{j['end']}"
         s = f"r/{j['sub']} '{j['term']}' {span} 언급 검색"
+    elif j["kind"] == "tiktok":
+        s = "틱톡 해시태그 통계"
     elif j["kind"] == "yt":
         s = f"유튜브 영상 검색 {j['start'][:7]}" + ("" if (j["start"], j["end"]) == month_bounds(j["start"][:7]) else f" ~ {j['end'][:7]}")
     elif j["kind"] == "ytc":

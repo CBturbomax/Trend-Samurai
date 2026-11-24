@@ -148,7 +148,7 @@ def remove_sub(kid: int, sub: str):
 @app.delete("/api/keywords/{kid}")
 def delete_keyword(kid: int):
     for t in ("variants", "subreddits", "candidates", "jobs", "global_counts", "global_months",
-              "yt_videos", "yt_windows", "yt_snapshots"):
+              "yt_videos", "yt_windows", "yt_snapshots", "tt_snapshots"):
         x(f"DELETE FROM {t} WHERE keyword_id=?", (kid,))
     x("DELETE FROM trends WHERE batch LIKE ?", (f"{kid}:%",))
     x("DELETE FROM keywords WHERE id=?", (kid,))
@@ -293,7 +293,12 @@ def build(kid: int):
         "SELECT day, videos, views, comments FROM yt_snapshots WHERE keyword_id=? ORDER BY day DESC LIMIT 60", (kid,))]
     yt["total"] = q("SELECT COUNT(*) n FROM yt_videos WHERE keyword_id=?", (kid,))[0]["n"]
 
+    tt = {}
+    for r in q("SELECT tag, day, videos, views FROM tt_snapshots WHERE keyword_id=? ORDER BY day DESC", (kid,)):
+        tt.setdefault(r["tag"], []).append({"day": r["day"], "videos": r["videos"], "views": r["views"]})
+
     return {
+        "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
         "youtube": yt,
         "global": glob,
         "id": kid, "keyword": k[0]["name"], "variants": terms, "months": months,
@@ -344,6 +349,12 @@ def export_csv(kid: int):
                                   ("youtube_comments_of_uploads", c, "그 달에 올라온 영상의 현재 누적 댓글 수")):
             w.writerow([d["keyword"], metric, "YouTube Data API", "", "", "", m, val, "", "",
                         int(m == d["cur_month"]), note])
+    for t in d["tiktok"]:
+        for r in t["rows"]:
+            w.writerow([d["keyword"], "tiktok_hashtag_posts_total", "TikTok", "", "#" + t["tag"], "", r["day"],
+                        r["videos"], "", "", "", "그날까지의 누적 게시물 수"])
+            w.writerow([d["keyword"], "tiktok_hashtag_views_total", "TikTok", "", "#" + t["tag"], "", r["day"],
+                        r["views"], "", "", "", "그날까지의 누적 조회수"])
     for s in d["trends"]:
         for m, (v, partial) in s["points"].items():
             w.writerow([d["keyword"], f"search_interest_{s['gprop']}", "Google Trends", "", s["term"],
