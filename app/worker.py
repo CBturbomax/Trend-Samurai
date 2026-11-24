@@ -339,7 +339,8 @@ def do_discover(job):
         results.append((sub, score.get(sub, 0), hits))
         x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,?,?)",
           (kid, sub, score.get(sub, 0), -1 if hits is None else hits))   # 진행 상황이 보이게 바로 기록
-    x("DELETE FROM candidates WHERE keyword_id=?", (kid,))
+    # 이번에 센 것만 지우고 다시 씀(작업 도중 새로 들어온 미확인 후보는 남겨 둠)
+    x("DELETE FROM candidates WHERE keyword_id=? AND hits IS NOT NULL", (kid,))
     added = q("SELECT COUNT(*) n FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))[0]["n"]
     for sub, sc, hits in sorted(results, key=lambda r: -(r[2] or 0)):
         if hits is not None and hits >= C.AUTO_ADD_MIN_HITS and added < C.AUTO_ADD_MAX:
@@ -348,8 +349,12 @@ def do_discover(job):
         else:
             x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,?,?)",
               (kid, sub, sc, -1 if hits is None else hits))
-    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"disc_{kid}", "1", time.time()))
+    left = q("SELECT 1 FROM candidates WHERE keyword_id=? AND hits IS NULL LIMIT 1", (kid,))
+    if not left:
+        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"disc_{kid}", "1", time.time()))
     _set(job, "done")
+    if left:   # 도중에 들어온 후보가 있으면 바로 한 번 더
+        _add(kid, "discover", 1)
     enqueue_keyword(kid)
 
 
