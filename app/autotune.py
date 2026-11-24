@@ -80,10 +80,10 @@ def tune():
     n, ok = _since("youtube", t0)
     if n >= 8:   # 간격이 길면 5분에 20번도 못 하므로 '전부 성공'이 아니라 비율로 판단
         r = ok / n
-        if r < 0.7:
-            _set_gap("youtube", GAPS["youtube"] * 1.4, f"최근 5분 성공 {r:.0%}")
-        elif r >= 0.9:
-            _set_gap("youtube", GAPS["youtube"] * 0.8, f"최근 5분 성공 {r:.0%}")
+        if r < 0.85:   # 실패가 15%를 넘으면 재시도 대기로 오히려 느려짐 → 간격을 늘림
+            _set_gap("youtube", GAPS["youtube"] * 1.3, f"최근 5분 성공 {r:.0%}")
+        elif r >= 0.95:
+            _set_gap("youtube", GAPS["youtube"] * 0.85, f"최근 5분 성공 {r:.0%}")
     # 댓글 검색이 한 번도 안 된 커뮤니티는 빼기
     for r in q("SELECT key, value FROM meta WHERE key LIKE 'cfail:%' AND CAST(value AS INTEGER) >= 25"):
         sub = r["key"][6:]
