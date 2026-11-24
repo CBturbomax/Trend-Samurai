@@ -652,6 +652,12 @@ def _next(kinds=None):
         state["turn"] = state.get("turn", 0) + 1
         if state["turn"] % 3 == 0:   # 세 번에 한 번은 유튜브 댓글 수(뒤로 밀려 영영 안 받아지는 일 방지)
             r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='ytc' ORDER BY id LIMIT 1", (now,))
+    if not r and "mention" in kinds:
+        # 레딧: 커뮤니티 고르기(discover)와 언급 수 세기(mention)를 번갈아 → 한쪽만 계속 돌지 않게
+        state["rturn"] = state.get("rturn", 0) + 1
+        if state["rturn"] % 2 == 0:
+            r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='mention' "
+                  "ORDER BY priority, month DESC, id LIMIT 1", (now,))
     if not r:
         r = q(f"SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind IN ({ks}) "
               "ORDER BY priority, month DESC, id LIMIT 1", (now, *kinds))
