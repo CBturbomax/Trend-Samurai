@@ -14,7 +14,7 @@ from .db import q, x
 
 STATS = collections.defaultdict(lambda: collections.deque(maxlen=3000))   # source → (시각, 성공여부)
 LOG = collections.deque(maxlen=60)
-BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (1.5, 15.0)}
+BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (1.5, 10.0)}
 GAPS = {"arctic": C.ARCTIC_GAP, "trends": 180.0, "youtube": C.YT_WEB_GAP}
 NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡"}
 
@@ -78,12 +78,12 @@ def tune():
         _set_gap("trends", GAPS["trends"] * 0.75, f"최근 1시간 {n_h}번 연속 성공")
     # 유튜브: 403 등 실패가 15% 넘으면 느리게, 20번 넘게 전부 성공하면 조금 당김
     n, ok = _since("youtube", t0)
-    if n >= 10:
+    if n >= 8:   # 간격이 길면 5분에 20번도 못 하므로 '전부 성공'이 아니라 비율로 판단
         r = ok / n
-        if r < 0.85:
-            _set_gap("youtube", GAPS["youtube"] * 1.6, f"최근 5분 성공 {r:.0%}")
-        elif r == 1 and n >= 20:
-            _set_gap("youtube", GAPS["youtube"] * 0.9, f"최근 5분 {n}번 전부 성공")
+        if r < 0.7:
+            _set_gap("youtube", GAPS["youtube"] * 1.4, f"최근 5분 성공 {r:.0%}")
+        elif r >= 0.9:
+            _set_gap("youtube", GAPS["youtube"] * 0.8, f"최근 5분 성공 {r:.0%}")
     # 댓글 검색이 한 번도 안 된 커뮤니티는 빼기
     for r in q("SELECT key, value FROM meta WHERE key LIKE 'cfail:%' AND CAST(value AS INTEGER) >= 25"):
         sub = r["key"][6:]
