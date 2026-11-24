@@ -150,14 +150,14 @@ function visMonths(ms){const n=S.range==='1y'?13:S.range==='3y'?37:ms.length;ret
    series: [{name,color,pts:{'2024-01':값|null}}]  o:{title,desc,source,foot,months,cur} */
 function chart(id,o){
   const hid=S.hidden[id]||(S.hidden[id]=new Set(o.defaultHidden||[]));
-  const months=visMonths(o.months), series=o.series.filter(s=>!hid.has(s.name));
+  const months=o.daily?o.months:visMonths(o.months), series=o.series.filter(s=>!hid.has(s.name));
   REG[id]={months,series};
   const lg=o.series.length>1?`<div class="legend">${o.series.map(s=>`<button class="lg ${hid.has(s.name)?'off':''}" data-chart="${id}" data-s="${esc(s.name)}"><i style="background:${s.color}"></i>${esc(s.name)}</button>`).join('')}</div>`:'';
   const empty=!series.some(s=>months.some(m=>s.pts[m]!=null));
   return `<section class="panel"><div class="panel-head"><h2>${esc(o.title)}</h2></div><p class="desc">${o.desc}</p>${lg}
    ${empty?'<div class="box dim">아직 받은 데이터가 없습니다. 수집되는 대로 표시됩니다.</div>':
    `<div class="chart-box"><div class="pc pcwrap">${pcSvg(id,months,series,o)}<div class="tip"></div></div><div class="mo">${moSvg(months,series,o)}</div></div>`}
-   <div class="foot"><span>${o.foot||''} 점선 = 진행 중인 달. 노란 점 = 최신 완료월.</span><span class="src">출처: ${esc(o.source)}</span></div></section>`;
+   <div class="foot"><span>${o.foot||''} ${o.daily?'':'점선 = 진행 중인 달. 흰 테두리 큰 점 = 최신 완료월.'}</span><span class="src">출처: ${esc(o.source)}</span></div></section>`;
 }
 function maxOf(series,months){let mx=0;series.forEach(s=>months.forEach(m=>{const v=s.pts[m];if(v!=null&&v>mx)mx=v}));return mx}
 const PC={W:1100,H:440,L:66,R:44,T:30,B:44};
@@ -167,24 +167,24 @@ function pcSvg(id,months,series,o){
   const ci=months.indexOf(o.cur), li=ci>0?ci-1:(ci<0?n-1:-1);
   let g='';
   for(let v=0;v<=ym+1e-9;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${Yv(v)}" y2="${Yv(v)}" stroke="#2a3540"/><text x="${L-10}" y="${Yv(v)+5}" text-anchor="end" fill="#9aa7b3" font-size="15">${tick(v)}</text>`;
-  months.forEach((m,i)=>{const jan=m.endsWith('-01');if(n<=13||jan||(n<=37&&m.endsWith('-07')))g+=`<text x="${X(i)}" y="${H-B+24}" text-anchor="middle" fill="${jan?'#fff':'#9aa7b3'}" font-size="15">${n<=13?m.slice(2):jan?m.slice(0,4):m.slice(5)+'월'}</text>`+(jan?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#2a3540" stroke-dasharray="2 4"/>`:'')});
+  months.forEach((m,i)=>{if(o.daily){if(n<=16||m.endsWith('-01')||i===0||i===n-1||(n<=70&&i%7===0))g+=`<text x="${X(i)}" y="${H-B+24}" text-anchor="middle" fill="#9aa7b3" font-size="15">${m.slice(5)}</text>`;return}const jan=m.endsWith('-01');if(n<=13||jan||(n<=37&&m.endsWith('-07')))g+=`<text x="${X(i)}" y="${H-B+24}" text-anchor="middle" fill="${jan?'#fff':'#9aa7b3'}" font-size="15">${n<=13?m.slice(2):jan?m.slice(0,4):m.slice(5)+'월'}</text>`+(jan?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#2a3540" stroke-dasharray="2 4"/>`:'')});
   series.forEach(s=>{
     let d='',pen=false;
     months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Yv(v).toFixed(1);pen=true});
     g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.bold?3:2.2}" stroke-linejoin="round"/>`;
     if(ci>0&&s.pts[o.cur]!=null&&s.pts[months[ci-1]]!=null)g+=`<line x1="${X(ci-1)}" y1="${Yv(s.pts[months[ci-1]])}" x2="${X(ci)}" y2="${Yv(s.pts[o.cur])}" stroke="${s.color}" stroke-width="2.2" stroke-dasharray="6 5"/>`;
     months.forEach((m,i)=>{const v=s.pts[m];if(v==null)return;
-      if(i===li)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="6" fill="${Y}" stroke="#0f1419" stroke-width="2"/>`;
+      if(i===li)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="6" fill="${s.color}" stroke="#fff" stroke-width="2"/>`;
       else if(i===ci)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="3.5" fill="#0f1419" stroke="${s.color}" stroke-width="2"/>`;
       else g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="${n<=40?3.2:2.4}" fill="${s.color}" stroke="#151b22" stroke-width="1"/>`});
   });
   /* 값 라벨: 기본은 최신 12개월 + 각 연말. 겹치면 위→아래→더 위 순으로 피하고, 자리가 없으면 생략 */
   const boxes=[],hit=(a,b)=>a[0]<b[0]+b[2]&&b[0]<a[0]+a[2]&&a[1]<b[1]+b[3]&&b[1]<a[1]+a[3];
   const order=[li,...months.map((_,i)=>n-1-i).filter(i=>i!==li)].filter(i=>i>=0);
-  order.forEach(i=>{const m=months[i];if(!(S.allLabels||(series.length<3&&i>=n-12)||m.endsWith('-12')||i===li))return;
+  order.forEach(i=>{const m=months[i];if(!(S.allLabels||(series.length<3&&i>=n-12)||(!o.daily&&m.endsWith('-12'))||i===li))return;
     series.forEach(s=>{const v=s.pts[m];if(v==null)return;const t=fmt(v),w=t.length*8.4+6,x=Math.min(Math.max(X(i),L+w/2),W-w/2-2),y=Yv(v);
       for(const dy of [-11,22,-27,38]){const b=[x-w/2,y+dy-14,w,17];if(b[1]<2||b[1]+17>T+ph+2||boxes.some(o2=>hit(b,o2)))continue;boxes.push(b);
-        g+=`<text x="${x}" y="${y+dy}" text-anchor="middle" fill="${i===li?Y:s.color}" font-size="14" font-weight="${i===li?700:500}" paint-order="stroke" stroke="#151b22" stroke-width="4">${t}</text>`;break}})});
+        g+=`<text x="${x}" y="${y+dy}" text-anchor="middle" fill="${s.color}" font-size="${i===li?15:14}" font-weight="${i===li?800:500}" paint-order="stroke" stroke="#151b22" stroke-width="4">${t}</text>`;break}})});
   if(ci>=0)g+=`<text x="${W-R}" y="${T-12}" text-anchor="end" fill="#9aa7b3" font-size="14">┄ ${o.cur} 진행 중</text>`;
   g+=`<line class="guide" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".35" style="display:none"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" data-id="${id}" role="img">${g}</svg>`;
@@ -204,8 +204,8 @@ function moSvg(months,series,o){
   ms.forEach((m,i)=>{const jan=m.endsWith('-01');
     if(i===li)g+=`<rect x="0" y="${top+i*rh}" width="${W}" height="${rh}" fill="#1b232b"/>`;
     if(jan&&i>0)g+=`<line x1="0" x2="${W}" y1="${top+i*rh}" y2="${top+i*rh}" stroke="#2a3540"/>`;
-    g+=`<text x="2" y="${Yi(i)+4}" fill="${i===li?Y:jan||i===ci?'#fff':'#9aa7b3'}" font-size="12" font-weight="${i===li||jan?700:400}">${m.slice(2)}${i===ci?'*':''}</text>`;
-    if(table)series.forEach((s,j)=>{const v=s.pts[m];if(v!=null)g+=`<text x="${W-tw+(j+1)*cw-2}" y="${Yi(i)+4}" text-anchor="end" fill="${i===li?Y:s.color}" font-size="${k>4?9.5:11}" font-weight="${i===li?700:400}">${fmtS(v)}</text>`})});
+    g+=`<text x="2" y="${Yi(i)+4}" fill="${i===li||jan||i===ci?'#fff':'#9aa7b3'}" font-size="12" font-weight="${i===li||jan?700:400}">${o.daily?m.slice(5):m.slice(2)}${i===ci?'*':''}</text>`;
+    if(table)series.forEach((s,j)=>{const v=s.pts[m];if(v!=null)g+=`<text x="${W-tw+(j+1)*cw-2}" y="${Yi(i)+4}" text-anchor="end" fill="${s.color}" font-size="${k>4?9.5:11}" font-weight="${i===li?700:400}">${fmtS(v)}</text>`})});
   series.forEach(s=>{let d='',pen=false;
     ms.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+Xv(v).toFixed(1)+' '+Yi(i);pen=true});
     g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
@@ -213,11 +213,11 @@ function moSvg(months,series,o){
   /* 점 + 값 */
   ms.forEach((m,i)=>{const row=series.map(s=>({s,v:s.pts[m]})).filter(r=>r.v!=null).sort((a,b)=>a.v-b.v);
     row.forEach((r,j)=>{const x=Xv(r.v),y=Yi(i),c=r.s.color;
-      g+=i===li?`<circle cx="${x}" cy="${y}" r="5" fill="${Y}" stroke="#0f1419" stroke-width="1.5"/>`:i===ci?`<circle cx="${x}" cy="${y}" r="3.5" fill="#0f1419" stroke="${c}" stroke-width="2"/>`:`<circle cx="${x}" cy="${y}" r="3" fill="${c}" stroke="#151b22" stroke-width="1"/>`;
+      g+=i===li?`<circle cx="${x}" cy="${y}" r="5" fill="${c}" stroke="#fff" stroke-width="1.5"/>`:i===ci?`<circle cx="${x}" cy="${y}" r="3.5" fill="#0f1419" stroke="${c}" stroke-width="2"/>`:`<circle cx="${x}" cy="${y}" r="3" fill="${c}" stroke="#151b22" stroke-width="1"/>`;
       if(table)return;
       const t=fmtS(r.v),w=t.length*7+4;let left=row.length===2?j===0:x+9+w>W-2;   // 두 선이면 작은 값은 왼쪽, 큰 값은 오른쪽에
       if(left&&x-9-w<x0)left=false;if(!left&&x+9+w>W-2)left=true;
-      g+=`<text x="${left?x-9:x+9}" y="${y+4}" text-anchor="${left?'end':'start'}" fill="${i===li?Y:c}" font-size="12" font-weight="${i===li?700:500}" paint-order="stroke" stroke="${i===li?'#1b232b':'#151b22'}" stroke-width="3">${t}</text>`})});
+      g+=`<text x="${left?x-9:x+9}" y="${y+4}" text-anchor="${left?'end':'start'}" fill="${c}" font-size="12" font-weight="${i===li?800:500}" paint-order="stroke" stroke="${i===li?'#1b232b':'#151b22'}" stroke-width="3">${t}</text>`})});
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg><div class="small dim">위 = 과거, 아래 = 최신 · * 진행 중인 달${table?' · 오른쪽 숫자는 범례 색 순서':''}</div>`;
 }
 document.addEventListener('mousemove',e=>{const svg=e.target.closest&&e.target.closest('.pcwrap svg');if(!svg)return;
@@ -235,6 +235,8 @@ function ownSeries(d,idx){ // idx 0=글, 1=댓글 → 하루 평균
     pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,S.unit==='daily'?v[idx]/daysIn(m,d):v[idx]]))}));
 }
 const UN=()=>S.unit==='daily'?{t:'하루 평균 ',u:'개/일',s:'/일',n:''}:{t:'월별 ',u:'개/월',s:'/월',n:' 진행 중인 달은 오늘까지의 합계라 낮게 보임.'};
+function sumAny(name,list,months){const pts={};months.forEach(m=>{const v=list.map(s=>s.pts[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});return{name,color:Y,bold:true,pts,mode:'avg'}}
+const ownAll=(d,idx)=>{const l=ownSeries(d,idx);if(l.length<2)return l;const t=sumAny('합계',l,d.months);if(S.unit==='daily'){t.mode='daily';t.raw={};d.months.forEach(m=>{const v=l.map(s=>s.raw[m]).filter(x=>x!=null);if(v.length)t.raw[m]=v.reduce((a,b)=>a+b,0)})}return[t,...l]};
 function sumSeries(name,list,months){const pts={};months.forEach(m=>{if(list.length&&list.every(s=>s.pts[m]!=null))pts[m]=list.reduce((a,s)=>a+s.pts[m],0)});return{name,color:Y,bold:true,pts}}
 function mentionBySub(d){const l=Object.entries(d.mentions).map(([sub,ms],i)=>({name:'r/'+sub,color:PAL[i%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,by])=>[m,Object.values(by).reduce((a,b)=>a+b,0)]))}));
   return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
@@ -260,8 +262,8 @@ function yearTable(d){
   const years=[];for(let y=2019;y<=LY;y++)years.push(y);
   const rows=[],sec=t=>rows.push({sec:t});
   sec('레딧');
-  ownSeries(d,1).forEach(s=>rows.push({label:`${s.name} 댓글${UN().s}`,short:'댓글'+UN().s,s}));
-  ownSeries(d,0).forEach(s=>rows.push({label:`${s.name} 글${UN().s}`,short:'글'+UN().s,s}));
+  ownAll(d,1).forEach(s=>rows.push({label:`${s.name==='합계'?'전용 서브레딧 합계':s.name} 댓글${UN().s}`,short:'댓글'+UN().s,s}));
+  ownAll(d,0).forEach(s=>rows.push({label:`${s.name==='합계'?'전용 서브레딧 합계':s.name} 글${UN().s}`,short:'글'+UN().s,s}));
   if(d.global&&d.global.enabled){const gc=globalSeries(d,'comment',true)[0],gp=globalSeries(d,'submission',true)[0];if(Object.keys(gc.pts).length)rows.push({label:'레딧 전체 언급 댓글 (월평균)',short:'전체 댓글',s:gc});if(Object.keys(gp.pts).length)rows.push({label:'레딧 전체 언급 글 (월평균)',short:'전체 글',s:gp})}
   mentionBySub(d).forEach(s=>rows.push({label:`언급 글 · ${s.name}`,short:'언급 '+s.name.replace('r/','').slice(0,6),s}));
   sec('유튜브');
@@ -325,8 +327,8 @@ function viewYoutube(d){
 function viewOwn(d){
   if(!Object.keys(d.own).length)return '<div class="box dim">전용 서브레딧을 고르지 않았습니다.</div>';
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:FOOT_R};
-  return chart('own-c',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'댓글 수',desc:'단위: '+UN().u+'. 메인 지표. 서브레딧이 생기기 전 달은 표시하지 않음.'+UN().n,series:ownSeries(d,1)})
-       + chart('own-p',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'글 수',desc:'단위: '+UN().u+'. 보조 지표(지워진 글·재업로드로 출렁일 수 있음).'+UN().n,series:ownSeries(d,0)});
+  return chart('own-c',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'댓글 수',desc:'단위: '+UN().u+'. 메인 지표. 서브레딧이 생기기 전 달은 표시하지 않음.'+UN().n,series:ownAll(d,1)})
+       + chart('own-p',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'글 수',desc:'단위: '+UN().u+'. 보조 지표(지워진 글·재업로드로 출렁일 수 있음).'+UN().n,series:ownAll(d,0)});
 }
 function viewMention(d){
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift 글 검색',foot:'자체 계산, 공식 수치 아님. 변형별로 따로 세어 더함(한 글에 두 변형이 있으면 중복).'};
@@ -345,16 +347,16 @@ function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
   const tags=d.tiktok||[];
   if(!tags.length)return '<div class="box dim">아직 받은 틱톡 데이터가 없습니다. 하루에 한 번 해시태그 통계를 기록합니다.</div>';
-  const big=n=>n.toLocaleString();
-  return tags.map(t=>{const r=t.rows,now=r[0],first=r[r.length-1],days=r.length;
-    return `<section class="panel"><div class="panel-head"><h2>틱톡 · #${esc(t.tag)}</h2><span class="count">기준일 ${now.day} · 기록 ${days}일째</span></div>
-     <div class="kpi-strip" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-       <div class="kpi is-done"><span class="kpi-label">게시물 수 (누적)</span><strong class="kpi-num">${fmtS(now.videos)}</strong><span class="small dim">${big(now.videos)}개</span></div>
-       <div class="kpi is-total"><span class="kpi-label">조회수 (누적)</span><strong class="kpi-num">${fmtS(now.views)}</strong><span class="small dim">${big(now.views)}회</span></div>
-       <div class="kpi is-todo"><span class="kpi-label">기록 시작 후 늘어난 게시물</span><strong class="kpi-num">${days>1?'+'+fmtS(now.videos-first.videos):'–'}</strong><span class="small dim">${days>1?first.day+' 이후':'내일부터 표시'}</span></div>
-     </div>
-     <div class="table-wrap"><table class="data-table"><thead><tr><th>날짜</th><th>게시물 수</th><th>전날 대비</th><th>조회수</th><th>전날 대비</th></tr></thead><tbody>${r.slice(0,30).map((x,i)=>{const p=r[i+1],dv=p?x.videos-p.videos:null,dw=p?x.views-p.views:null;return `<tr><td>${x.day}</td><td>${big(x.videos)}</td><td class="${dv>0?'up':dv<0?'down':''}">${dv==null?'–':(dv>=0?'+':'')+big(dv)}</td><td>${big(x.views)}</td><td class="${dw>0?'up':dw<0?'down':''}">${dw==null?'–':(dw>=0?'+':'')+big(dw)}</td></tr>`}).join('')}</tbody></table></div>
-     <div class="foot"><span>틱톡은 과거 추이를 주지 않아, 오늘부터 하루 한 번 누적값을 기록해 추세를 만듦. 전세계 합계(지역 구분 없음).</span><span class="src">출처: TikTok 해시태그 페이지 (비공식)</span></div></section>`}).join('');
+  const days=[...new Set(tags.flatMap(t=>t.rows.map(r=>r.day)))].sort();
+  const mk=(f)=>tags.map((t,i)=>({name:'#'+t.tag,color:PAL[i%PAL.length],pts:Object.fromEntries(t.rows.map(r=>[r.day,r[f]]))}));
+  const inc=(f)=>tags.map((t,i)=>{const r=[...t.rows].reverse(),pts={};for(let k=1;k<r.length;k++)pts[r[k].day]=r[k][f]-r[k-1][f];return{name:'#'+t.tag,color:PAL[i%PAL.length],pts}});
+  const o={daily:true,months:days,cur:null,source:'TikTok 해시태그 페이지 (비공식)',foot:'전세계 합계(지역 구분 없음). 하루 한 번 기록.'};
+  const note=days.length<2?` <b class="warn">기록 ${days.length}일째라 아직 점 하나뿐. 날마다 한 점씩 이어짐.</b>`:'';
+  return (days.length>1?chart('tt-dv',{...o,months:days.slice(1),title:'틱톡 · 하루에 새로 올라온 게시물 수',desc:'단위: 개/일. 해시태그가 달린 게시물이 전날보다 얼마나 늘었는지.',series:inc('videos')})
+      +chart('tt-dw',{...o,months:days.slice(1),title:'틱톡 · 하루에 늘어난 조회수',desc:'단위: 회/일. 해시태그 누적 조회수가 전날보다 얼마나 늘었는지.',series:inc('views')}):'')
+    +chart('tt-v',{...o,title:'틱톡 · 해시태그 게시물 수 (누적)',desc:'단위: 개. 그날까지 그 해시태그로 올라온 게시물 총수.'+note,series:mk('videos')})
+    +chart('tt-w',{...o,title:'틱톡 · 해시태그 조회수 (누적)',desc:'단위: 회. 그날까지의 누적 조회수.'+note,series:mk('views')})
+    +'<div class="box small dim">틱톡은 과거 추이를 로그인 없이는 주지 않습니다(추세 페이지가 로그인 필요). 그래서 '+days[0]+'부터 매일 기록한 값으로 시계열을 만들고, 과거 구간은 없습니다.</div>';
 }
 function viewGoogle(d){return trendChart(d,'web')}
 function viewCompare(){
