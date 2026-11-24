@@ -119,7 +119,8 @@ def enqueue_keyword(kid, refresh=False):
                 "SELECT start FROM mention_windows WHERE sub=? AND term=?", (s["name"], t))}
             years = {}
             for m in all_months():
-                years.setdefault(m[:4], []).append(m)
+                if full or m >= C.MENTION_POST_START:   # 기본은 최근 몇 년만(속도). '과거까지 받기'를 고르면 2019년부터
+                    years.setdefault(m[:4], []).append(m)
             if t.startswith(CPFX):   # 댓글: 최근 구간의 빈 달이 이어져 있으면 전체를 한 번에
                 am = all_months()
                 run = [m for m in am if m >= comment_from and month_bounds(m)[0] not in have]

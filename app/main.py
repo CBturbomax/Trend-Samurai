@@ -31,6 +31,8 @@ async def lifespan(app):
     full = "(SELECT CAST(substr(key,6) AS INTEGER) FROM meta WHERE key LIKE 'full:%')"
     x(f"DELETE FROM jobs WHERE kind='yt' AND status!='done' AND start<? AND keyword_id NOT IN {full}",
       (C.YT_WEB_START + "-01",))
+    x(f"DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status!='done' AND start<? "
+      f"AND keyword_id NOT IN {full}", (C.MENTION_POST_START + "-01",))
     x(f"DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done' AND start<? "
       f"AND keyword_id NOT IN {full}", (worker.all_months()[-C.COMMENT_MONTHS] + "-01",))
     # 언급 커뮤니티가 아직 하나도 없는 키워드는 선별을 맨 앞에서(이게 끝나야 언급 차트가 생김), 재선별은 뒤로
