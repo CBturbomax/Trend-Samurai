@@ -68,7 +68,8 @@ def enqueue_keyword(kid, refresh=False):
                 _add(kid, "global", 2, term=kind, month=m)
     # 키워드가 언급되는 다른 서브레딧 자동 찾기: 일주일에 한 번
     d = q("SELECT updated_at FROM meta WHERE key=?", (f"disc_{kid}",))
-    if any(s["kind"] == "own" for s in subs) and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
+    seeds = len(subs) or q("SELECT 1 FROM candidates WHERE keyword_id=? LIMIT 1", (kid,))
+    if seeds and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
         _add(kid, "discover", 1)
     # 틱톡: 오늘 기록이 없으면 받음
     if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
@@ -290,25 +291,40 @@ def do_discover(job):
                 if i == 7:
                     raise
 
-    try:
-        for own in q("SELECT name FROM subreddits WHERE keyword_id=? AND kind='own'", (kid,)):
-            for author in retry(arctic.top_authors, own["name"]):
-                try:
-                    for sub, _ in retry(arctic.author_subreddits, author):
-                        if sub.lower() not in mine and not sub.startswith("u_"):
-                            score[sub] = score.get(sub, 0) + 1
-                except arctic.SlowDown:
-                    continue
-    except (arctic.SlowDown, arctic.BadRequest) as e:
-        if not score:   # 나중에 다시
-            t = job["tries"] + 1
-            return _set(job, "failed" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + 900, t)
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     since = (today() - dt.timedelta(days=365)).isoformat()
     until = (today() + dt.timedelta(days=1)).isoformat()
+    # 직접 넣어 준 후보(아직 언급 수를 안 센 것)는 먼저 확인
+    seeded = [r["name"] for r in q("SELECT name FROM candidates WHERE keyword_id=? AND hits IS NULL", (kid,))
+              if r["name"].lower() not in mine]
+    authors = []
+    try:
+        # 출발점 1: 전용 서브레딧에서 글을 많이 쓴 사람
+        for own in q("SELECT name FROM subreddits WHERE keyword_id=? AND kind='own'", (kid,)):
+            authors += retry(arctic.top_authors, own["name"])
+        # 출발점 2: 이미 추적 중인 서브레딧에서 키워드를 제목에 쓴 사람 (전용 서브레딧이 없어도 넓혀 감)
+        for men in q("SELECT name FROM subreddits WHERE keyword_id=? AND kind='mention' LIMIT 4", (kid,)):
+            for t in terms[:2]:
+                try:
+                    authors += retry(arctic.keyword_authors, men["name"], t, since)
+                except arctic.SlowDown:
+                    continue
+        for author in list(dict.fromkeys(authors))[:14]:
+            try:
+                for sub, _ in retry(arctic.author_subreddits, author):
+                    if sub.lower() not in mine and not sub.startswith("u_"):
+                        score[sub] = score.get(sub, 0) + 1
+            except arctic.SlowDown:
+                continue
+    except (arctic.SlowDown, arctic.BadRequest) as e:
+        if not score and not seeded:   # 나중에 다시
+            t = job["tries"] + 1
+            return _set(job, "failed" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + 900, t)
+    order = seeded + [s_ for s_, _ in sorted(score.items(), key=lambda kv: -kv[1]) if s_ not in seeded][:20]
     x("DELETE FROM candidates WHERE keyword_id=?", (kid,))
     added = q("SELECT COUNT(*) n FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))[0]["n"]
-    for sub, sc in sorted(score.items(), key=lambda kv: -kv[1])[:20]:
+    for sub in order:
+        sc = score.get(sub, 0)
         hits = None   # 그 서브레딧 제목에 키워드가 최근 1년간 몇 번 나왔는지 직접 확인
         try:
             hits = 0

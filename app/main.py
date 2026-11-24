@@ -138,6 +138,18 @@ def add_mention_subs(kid: int, body: SubsIn):
     return {"ok": True}
 
 
+@app.post("/api/keywords/{kid}/probe")
+def probe_subs(kid: int, body: SubsIn):
+    """후보 서브레딧을 넣으면, 키워드 언급 수를 세어 많은 곳만 자동으로 추적한다."""
+    have = {r["name"].lower() for r in q("SELECT name FROM subreddits WHERE keyword_id=?", (kid,))}
+    for s in filter(None, map(_clean_sub, body.subs)):
+        if s.lower() not in have:
+            x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,0,NULL)", (kid, s))
+    x("DELETE FROM meta WHERE key=?", (f"disc_{kid}",))
+    worker._add(kid, "discover", 1)
+    return {"ok": True}
+
+
 @app.delete("/api/keywords/{kid}/subs/{sub}")
 def remove_sub(kid: int, sub: str):
     x("DELETE FROM subreddits WHERE keyword_id=? AND name=?", (kid, sub))

@@ -332,7 +332,7 @@ function viewMention(d){
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift 글 검색',foot:'자체 계산, 공식 수치 아님. 변형별로 따로 세어 더함(한 글에 두 변형이 있으면 중복).'};
   const cands=d.candidates.length?`<div class="box"><b>추천 서브레딧</b> <span class="dim small">(전용 서브레딧 사람들이 함께 활동하는 곳 중 언급이 적어 자동 추적에서 빠진 곳. 필요하면 체크해 추가)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'':'최근 1년 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
   return `<section class="panel"><div class="panel-head"><h2>레딧 · 언급을 볼 서브레딧</h2></div><div class="row">${d.subs.filter(s=>s.kind==='mention').map(s=>`<span class="chip">r/${esc(s.name)} <a href="#" class="rmsub warn" data-s="${esc(s.name)}">✕</a></span>`).join('')||'<span class="dim">없음</span>'}</div>
-   ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="직접 추가: transformers, ActionFigures"></label><button class="btn" id="btnAddSubs">추가하고 수집</button></div></section>`
+   ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="서브레딧 이름 (쉼표로 구분)"></label><button class="btn main" id="btnProbe">후보로 넣고 자동 선별</button><button class="btn" id="btnAddSubs">바로 추가</button></div></section>`
    + mentionCharts(d,o);
 }
 function mentionCharts(d,o){
@@ -448,6 +448,7 @@ document.addEventListener('click',async e=>{
   else if(t.id==='btnLabels'){S.allLabels=!S.allLabels;render()}
   else if(t.closest('.lg')){const b=t.closest('.lg'),h=S.hidden[b.dataset.chart];h.has(b.dataset.s)?h.delete(b.dataset.s):h.add(b.dataset.s);render()}
   else if(t.id==='btnAddSubs'){const subs=[...vals('.candck'),...split($('#addSubs').value)];if(subs.length){await api(`/api/keywords/${S.kid}/mention_subs`,{body:{subs}});loadData()}}
+  else if(t.id==='btnProbe'){const subs=split($('#addSubs').value);if(subs.length){await api(`/api/keywords/${S.kid}/probe`,{body:{subs}});$('#addSubs').value='';lastDone=-1}}
   else if(t.classList.contains('rmsub')){e.preventDefault();if(confirm(`r/${t.dataset.s} 을(를) 빼고 남은 수집을 취소할까요?`)){await api(`/api/keywords/${S.kid}/subs/${encodeURIComponent(t.dataset.s)}`,{method:'DELETE'});loadData()}}
   else if(t.id==='btnYtKey'){const m=$('#ytKeyMsg');m.textContent='키 확인 중…';try{await api('/api/settings/youtube',{body:{key:$('#ytKey').value}});lastDone=-1;await loadData()}catch(err){m.textContent=err.message}}
   else if(t.id==='btnCsv')location.href=`/api/keywords/${S.kid}/export.csv`;
