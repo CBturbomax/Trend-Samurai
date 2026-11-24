@@ -3,6 +3,7 @@ import calendar
 from datetime import datetime, timezone
 import csv
 import io
+import json
 import os
 import secrets
 import time
@@ -201,6 +202,8 @@ class KeyIn(BaseModel):
 class TTHistIn(BaseModel):
     keyword: str
     rows: list[list]   # [[week 'YYYY-MM-DD', value], ...]
+    unit: str = "activity"   # activity(키워드 활동 지수) | views(회사 단위 해시태그 조회수)
+    label: str = ""           # views일 때 회사명·종목코드
 
 
 @app.post("/api/tiktok/history")
@@ -212,6 +215,7 @@ def tiktok_history(body: TTHistIn):
     x("DELETE FROM tt_history WHERE keyword_id=?", (kid,))
     for wk, v in body.rows:
         x("INSERT OR REPLACE INTO tt_history VALUES(?,?,?)", (kid, wk, float(v)))
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"ttsrc:{kid}", json.dumps({"unit": body.unit, "label": body.label}), time.time()))
     return {"ok": True, "n": len(body.rows)}
 
 
@@ -362,6 +366,7 @@ def build(kid: int):
     return {
         "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
         "tiktok_history": tt_hist,
+        "tiktok_src": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ttsrc:{kid}",)) or [{"value": "{}"}])[0]["value"]),
         "mentions_c": mentions_c,
         "youtube": yt,
         "global": glob,

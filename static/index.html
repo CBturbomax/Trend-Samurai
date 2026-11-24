@@ -359,9 +359,10 @@ function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+ment
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
   const tags=d.tiktok||[],hist=d.tiktok_history||[];
-  const histChart=hist.length>1?chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,title:'틱톡 · 게시물 활동 지수 (주간, 최근 2년)',
-    desc:'단위: 상대 지수. 그 주 틱톡에서 이 키워드가 얼마나 얘기됐는지. 절대 게시물 수가 아니라 추세를 보는 값.',
-    foot:'TickerTrends 집계, 주 = 월요일 시작.',source:'TickerTrends (TikTok)',series:[{name:'활동 지수',color:PAL[3],pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]}):'';
+  const src=d.tiktok_src||{},isV=src.unit==='views';
+  const histChart=hist.length>1?chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,title:isV?`틱톡 · 회사 해시태그 조회수 (주간, 최근 2년) — ${src.label||''}`:'틱톡 · 게시물 활동 지수 (주간, 최근 2년)',
+    desc:isV?'단위: 조회수(TickerTrends 추정). <b class="warn">이 키워드가 아니라 해당 회사(종목) 전체의 틱톡 해시태그 조회 추세.</b> 키워드 단위 자료가 없을 때 대신 보여 줌.':'단위: 상대 지수. 그 주 틱톡에서 이 키워드가 얼마나 얘기됐는지. 절대 게시물 수가 아니라 추세를 보는 값.',
+    foot:'TickerTrends 집계.',source:'TickerTrends (TikTok)',series:[{name:isV?'해시태그 조회수':'활동 지수',color:PAL[3],pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]}):'';
   const days=[...new Set(tags.flatMap(t=>t.rows.map(r=>r.day)))].sort();
   if(!histChart&&days.length<2)return '<div class="box dim">아직 틱톡 시계열이 없습니다.</div>';
   if(days.length<2)return histChart;   // 해시태그 누적값은 이틀 이상 쌓여야 선이 됨
