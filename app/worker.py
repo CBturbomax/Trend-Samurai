@@ -273,7 +273,7 @@ def do_trends(job):
     except trends.TrendsBlocked as e:
         # 구글이 429로 막으면 계속 두드릴수록 오래 막힘 → 트렌드 작업 전체를 30분, 1시간, 2시간… 뒤로 미룸
         t = job["tries"] + 1
-        wait = min(1800 * 2 ** (t - 1), 6 * 3600)
+        wait = 2400 if t < 3 else 5400   # 막히면 40분(계속이면 90분) 쉬고 재개 — 너무 길게 쉬면 400건이 안 끝남
         x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status IN ('queued','hold')", (time.time() + wait,))
         return _set(job, "queued", f"구글이 요청 과다(429)로 잠시 막음 · {int(wait/60)}분 뒤 재시도 ({t}회째)", time.time() + wait, t)
     batch = f"{kid}:{job['gprop']}:{job['geo']}"
@@ -286,7 +286,7 @@ def do_trends(job):
     x("COMMIT")
     _set(job, "done", "" if any(data.values()) else "데이터 없음(검색량 부족)")
     # 구글 트렌드는 연달아 부르면 막힘 → 다음 트렌드 요청은 1분 뒤에
-    x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status='queued' AND next_at<?", (time.time() + 60,) * 2)
+    x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status='queued' AND next_at<?", (time.time() + 180,) * 2)   # 성공 뒤 3분 간격(구글 차단 방지)
 
 
 def do_discover(job):
