@@ -94,4 +94,7 @@ def q(sql, args=()):
 
 
 def x(sql, args=()):
-    return conn().execute(sql, args)
+    c = conn()
+    if sql == "BEGIN" and c.in_transaction:   # 앞선 요청이 중간에 실패해 트랜잭션이 열린 채 남았으면 정리(안 하면 그 스레드는 계속 500)
+        c.execute("ROLLBACK")
+    return c.execute(sql, args)
