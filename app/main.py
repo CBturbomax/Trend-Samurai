@@ -43,6 +43,8 @@ async def lifespan(app):
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")
+    if not C.AUTO_DISCOVER:
+        x("DELETE FROM jobs WHERE kind='discover' AND status IN ('queued','hold')")
     x("UPDATE jobs SET status='queued', next_at=0, tries=0 WHERE kind='yt' AND status='hold'")   # 유튜브 보류분은 재시작 때 다시
     # 레딧 글: 해마다 따로 묻던 대기 작업을 지우고 여러 해를 한 번에 묻는 작업으로 다시 넣음
     x("DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status='queued' AND tries=0 "
@@ -146,8 +148,8 @@ def create_keyword(body: KeywordIn):
         for s in filter(None, map(_clean_sub, subs)):
             x("INSERT OR REPLACE INTO subreddits VALUES(?,?,?)", (kid, s, kind))
     worker.enqueue_keyword(kid)
-    if body.own_subs:
-        worker._add(kid, "discover", 0)
+    if body.own_subs and (C.AUTO_DISCOVER or not q("SELECT 1 FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))):
+        worker._add(kid, "discover", 0)   # 새 키워드라 언급 커뮤니티가 없을 때만 자동 선별
     return {"id": kid}
 
 

@@ -86,7 +86,7 @@ def enqueue_keyword(kid, refresh=False):
     # 키워드가 언급되는 다른 서브레딧 자동 찾기: 일주일에 한 번
     d = q("SELECT updated_at FROM meta WHERE key=?", (f"disc_{kid}",))
     seeds = len(subs) or q("SELECT 1 FROM candidates WHERE keyword_id=? LIMIT 1", (kid,))
-    if seeds and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
+    if C.AUTO_DISCOVER and seeds and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
         _add(kid, "discover", 4 if any(s["kind"] == "mention" for s in subs) else 1)
     # 틱톡: 오늘 기록이 없으면 받음
     pass   # 틱톡 해시태그 일일 기록은 하지 않음(과거 추이는 TickerTrends 자료만)
