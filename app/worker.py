@@ -85,7 +85,7 @@ def enqueue_keyword(kid, refresh=False):
             wins = [(f"{y}-01-01", f"{y + 1}-01-01") for y in range(int(C.START_DATE[:4]), t0.year)]
             wins += [month_bounds(f"{t0.year}-{mo:02d}") for mo in range(1, t0.month + 1)]
         else:          # 키 없는 방식: 전부 월 단위, 최신 달부터
-            wins = [month_bounds(m) for m in reversed(all_months())]
+            wins = [month_bounds(m) for m in reversed(all_months()) if m >= C.YT_WEB_START]
         if refresh:  # 덜 끝난 기간(이번 달 등)은 다시 받음
             x("DELETE FROM yt_windows WHERE keyword_id=? AND status='open'", (kid,))
             if not yt_key():  # 조회수는 계속 늘므로 최근 3개월 + 가장 오래전에 받은 6개 달을 매일 다시 받음
@@ -105,6 +105,7 @@ def enqueue_keyword(kid, refresh=False):
         if s["kind"] != "mention":
             continue
         noc = bool(q("SELECT 1 FROM meta WHERE key=?", (f"nocomment:{s['name']}",)))
+        comment_from = all_months()[-C.COMMENT_MONTHS]
         for t in terms + ([] if noc else [CPFX + t for t in terms]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
@@ -125,6 +126,8 @@ def enqueue_keyword(kid, refresh=False):
                          start=f"{y}-01-01", end=f"{int(y) + 1}-01-01")
                 else:
                     for m in reversed(missing):
+                        if t.startswith(CPFX) and m < comment_from:   # 댓글은 최근 COMMENT_MONTHS개월만
+                            continue
                         a, b = month_bounds(m)
                         _add(kid, "mention", 5 if t.startswith(CPFX) else 3,   # 댓글은 글 검색이 다 끝난 뒤
                              sub=s["name"], term=t, month=m, start=a, end=b)
