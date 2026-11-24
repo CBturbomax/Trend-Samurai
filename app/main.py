@@ -40,6 +40,10 @@ async def lifespan(app):
         x("UPDATE jobs SET priority=? WHERE kind='trends' AND gprop=? AND geo=? AND status IN ('queued','hold')", (pr, g, r))
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
+    x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")   # 틱톡 해시태그 일일 기록은 그만둠(의미 없음)
+    # 레딧 댓글: 달마다 따로 묻던 대기 작업을 지우고, 빈 달 구간을 한 번에 묻는 작업으로 다시 넣음(요청 수 대폭 감소)
+    x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold') "
+      "AND julianday(end)-julianday(start)<=31")
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
     worker.start()

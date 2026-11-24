@@ -363,17 +363,10 @@ function viewTiktok(d){
   const histChart=hist.length>1?chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,title:isV?`틱톡 · 회사 해시태그 조회수 (주간, 최근 2년) — ${src.label||''}`:'틱톡 · 게시물 활동 지수 (주간, 최근 2년)',
     desc:isV?'단위: 조회수(TickerTrends 추정). <b class="warn">이 키워드가 아니라 해당 회사(종목) 전체의 틱톡 해시태그 조회 추세.</b> 키워드 단위 자료가 없을 때 대신 보여 줌.':'단위: 상대 지수. 그 주 틱톡에서 이 키워드가 얼마나 얘기됐는지. 절대 게시물 수가 아니라 추세를 보는 값.',
     foot:'TickerTrends 집계.',source:'TickerTrends (TikTok)',series:[{name:isV?'해시태그 조회수':'활동 지수',color:PAL[3],pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]}):'';
-  const days=[...new Set(tags.flatMap(t=>t.rows.map(r=>r.day)))].sort();
   // 활동 지수(표본 게시물 수)는 2026년 10월부터 수집 방식이 바뀌어 거의 모든 키워드가 같이 튐 → 참고용으로 접어 둠
-  const top=isV?histChart:'',ref=(!isV&&histChart)?`<details class="manage"><summary>참고: 게시물 활동 지수 <span class="warn">(신뢰 낮음)</span></summary><div class="box dim small" style="margin-top:10px">뉴스·검색으로 잡힌 <b>표본 게시물 수</b>라 실제 틱톡 규모가 아닙니다. 2026년 7~9월 수집 공백 뒤 10월부터 집계 방식이 바뀌어 거의 모든 키워드가 함께 뛰었습니다. 추세 판단에 쓰지 마세요.</div>${histChart}</details>`:'';
-  const note=isV?'':'<div class="box dim small">이 키워드는 믿을 만한 틱톡 과거 자료가 없습니다(비상장이거나 회사 단위 자료 없음). 아래는 서버가 매일 직접 기록하는 해시태그 수치입니다.</div>';
-  if(days.length<2)return top+note+(days.length?'<div class="box dim">해시태그 기록 '+days[0]+'부터 시작 — 이틀째부터 그래프가 그려집니다.</div>':'')+ref;
-  const mk=f=>tags.map((t,i)=>({name:'#'+t.tag,color:PAL[i%PAL.length],pts:Object.fromEntries(t.rows.map(r=>[r.day,r[f]]))}));
-  const inc=f=>tags.map((t,i)=>{const r=[...t.rows].reverse(),pts={};for(let k=1;k<r.length;k++)pts[r[k].day]=r[k][f]-r[k-1][f];return{name:'#'+t.tag,color:PAL[i%PAL.length],pts}});
-  const o={daily:true,cur:null,source:'TikTok 해시태그 페이지 (비공식)',foot:'전세계 합계. '+days[0]+'부터 하루 한 번 기록.'};
-  return top+note
-    +chart('tt-dv',{...o,months:days.slice(1),title:'틱톡 · 하루에 새로 올라온 게시물 수',desc:'단위: 개/일. 해시태그 게시물이 전날보다 늘어난 수.',series:inc('videos')})
-    +chart('tt-dw',{...o,months:days.slice(1),title:'틱톡 · 하루에 늘어난 조회수',desc:'단위: 회/일.',series:inc('views')})+ref;
+  if(isV)return histChart;
+  if(histChart)return `<div class="box dim small">이 키워드는 회사 단위 틱톡 조회수 자료가 없어 키워드 활동 지수만 있습니다.</div><details class="manage" open><summary>틱톡 키워드 활동 지수 <span class="warn">(신뢰 낮음)</span></summary><div class="box dim small" style="margin-top:10px">뉴스·검색으로 잡힌 <b>표본 게시물 수</b>라 실제 틱톡 규모가 아닙니다. 2026년 7~9월 수집 공백 뒤 10월부터 집계 방식이 바뀌어 거의 모든 키워드가 함께 뛰었습니다. 10월 이후 급등은 그대로 믿지 마세요.</div>${histChart}</details>`;
+  return '<div class="box dim">틱톡 자료 없음 — 키워드·회사 단위 과거 추이를 모두 찾아봤지만 없습니다.</div>';
 }
 function viewGoogle(d){return trendChart(d,'web')}
 function viewCompare(){

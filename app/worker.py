@@ -79,8 +79,7 @@ def enqueue_keyword(kid, refresh=False):
     if seeds and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
         _add(kid, "discover", 4 if any(s["kind"] == "mention" for s in subs) else 1)
     # 틱톡: 오늘 기록이 없으면 받음
-    if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
-        _add(kid, "tiktok", 1)
+    pass   # 틱톡 해시태그 일일 기록은 하지 않음(과거 추이는 TickerTrends 자료만)
     if True:
         t0 = today()
         if yt_key():   # 공식 API: 지난 해는 1년 단위, 올해는 월 단위
@@ -126,6 +125,15 @@ def enqueue_keyword(kid, refresh=False):
                 if not t.startswith(CPFX) and len(missing) == len(years[y]) and len(missing) > 1:   # 글은 해 단위로 먼저(댓글은 무거워 달 단위)
                     _add(kid, "mention", 3, sub=s["name"], term=t, month=f"{y}-12",
                          start=f"{y}-01-01", end=f"{int(y) + 1}-01-01")
+                elif t.startswith(CPFX):   # 댓글: 빈 달이 이어진 구간을 한 번에(최대 12개월)
+                    run = [m for m in missing if m >= comment_from]
+                    if len(run) > 1 and all(run[i + 1] == all_months()[all_months().index(run[i]) + 1] for i in range(len(run) - 1)):
+                        _add(kid, "mention", 5, sub=s["name"], term=t, month=run[-1],
+                             start=month_bounds(run[0])[0], end=month_bounds(run[-1])[1])
+                        continue
+                    for m in reversed(run):
+                        a, b = month_bounds(m)
+                        _add(kid, "mention", 5, sub=s["name"], term=t, month=m, start=a, end=b)
                 else:
                     for m in reversed(missing):
                         if t.startswith(CPFX) and m < comment_from:   # 댓글은 최근 COMMENT_MONTHS개월만
@@ -187,6 +195,7 @@ def _split(job, why):
 
 
 CPFX = "c:"   # 댓글 본문 검색어 표시
+MAX_PAGES = 15   # 여러 달짜리 요청에서 이어 받는 최대 횟수(1500건)
 
 
 def _search(job, after, before):
@@ -204,14 +213,20 @@ def do_mention(job):
     try:
         ts = _search(job, job["start"], job["end"])
         n = len(ts)
-        if days > 300:   # 해 단위 요청
-            months = [m for m in all_months() if m[:4] == job["start"][:4]]
-            if n >= 100:  # 한 해에 100건 이상 → 달 단위로 다시
+        if days > 40:   # 여러 달짜리 요청: 100건씩 이어 받아 달별로 나눔(달마다 따로 묻는 것보다 요청 수가 훨씬 적음)
+            months = [m for m in all_months() if job["start"][:7] <= m and month_bounds(m)[1] <= max(job["end"], month_bounds(job["start"][:7])[1])]
+            page = ts
+            pages = 1
+            while len(page) == 100 and pages < MAX_PAGES:
+                page = _search(job, page[-1] + 1, job["end"])
+                ts = ts + page
+                pages += 1
+            if len(page) == 100:  # 너무 많음 → 달 단위로 다시
                 for m in reversed(months):
-                    _add(job["keyword_id"], "mention", 3, sub=sub, term=job["term"], month=m,
-                         start=month_bounds(m)[0], end=month_bounds(m)[1])
+                    _add(job["keyword_id"], "mention", 3 if not job["term"].startswith(CPFX) else 5, sub=sub,
+                         term=job["term"], month=m, start=month_bounds(m)[0], end=month_bounds(m)[1])
                 state["sub_streak"][sub] = 0
-                return _set(job, "done", "한 해 100건 이상 → 달 단위로 나눔")
+                return _set(job, "done", f"{len(ts)}건 넘음 → 달 단위로 나눔")
             cnt = {}
             for t in ts:
                 k = dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime("%Y-%m")
@@ -222,9 +237,15 @@ def do_mention(job):
                   (sub, job["term"], ma, mb, cnt.get(m, 0),
                    "done" if today() >= dt.date.fromisoformat(mb) else "open", now_iso()))
             state["sub_streak"][sub] = 0
-            return _set(job, "done")
-        if n >= 100 and days > 1:
-            return _split(job, "100건 꽉 참 → 반으로 나눔")
+            if job["term"].startswith(CPFX):
+                x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"cok:{sub}", "1", time.time()))
+            return _set(job, "done", f"{len(ts)}건 · 요청 {pages}번")
+        if n >= 100 and days > 1:   # 한 달 창이 꽉 참 → 반으로 나누지 않고 이어 받기
+            page = ts
+            while len(page) == 100:
+                page = _search(job, page[-1] + 1, job["end"])
+                n += len(page)
+            ts = []
         while len(ts) == 100:  # 하루짜리 창인데도 100건: 이어서 받기
             ts = _search(job, ts[-1] + 1, job["end"])
             n += len(ts)
@@ -245,6 +266,11 @@ def do_mention(job):
         if job["term"].startswith(CPFX):   # 커뮤니티별 댓글 검색 실패 횟수(자동 조절이 봄)
             x("INSERT INTO meta VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1",
               (f"cfail:{sub}", "1", time.time()))
+        if days > 40 and tries >= 4:   # 긴 창이 계속 시간 초과 → 달 단위로
+            for m in reversed([m for m in all_months() if job["start"][:7] <= m < job["end"][:7]] or [job["start"][:7]]):
+                _add(job["keyword_id"], "mention", 5 if job["term"].startswith(CPFX) else 3, sub=sub, term=job["term"],
+                     month=m, start=month_bounds(m)[0], end=month_bounds(m)[1])
+            return _set(job, "done", f"{e} → 달 단위로 나눔")
         if job["term"].startswith(CPFX) and tries >= 6:   # 댓글은 오래 붙잡지 말고 보류 → 다른 달 먼저
             return _set(job, "hold", f"{e} · {tries}회 실패, 나중에 재시도", time.time() + 3600, tries)
         if tries < C.TRIES_BEFORE_SHRINK:
