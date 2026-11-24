@@ -25,6 +25,8 @@ async def lifespan(app):
     db.init()
     if not C.PULLPUSH_ENABLED:
         x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
+    x("DELETE FROM jobs WHERE kind='mention' AND status='queued' AND julianday(end)-julianday(start)<300")
+    x("UPDATE jobs SET priority=4 WHERE kind='discover' AND status='queued'")
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
     worker.start()
@@ -121,7 +123,7 @@ def create_keyword(body: KeywordIn):
             x("INSERT OR REPLACE INTO subreddits VALUES(?,?,?)", (kid, s, kind))
     worker.enqueue_keyword(kid)
     if body.own_subs:
-        worker._add(kid, "discover", 1)
+        worker._add(kid, "discover", 0)
     return {"id": kid}
 
 
@@ -146,7 +148,7 @@ def probe_subs(kid: int, body: SubsIn):
         if s.lower() not in have:
             x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,0,NULL)", (kid, s))
     x("DELETE FROM meta WHERE key=?", (f"disc_{kid}",))
-    worker._add(kid, "discover", 1)
+    worker._add(kid, "discover", 0)
     return {"ok": True}
 
 
@@ -202,7 +204,9 @@ def set_youtube_key(body: KeyIn):
 # ── 2) 진행 상황 ─────────────────────────────────────────
 @app.get("/api/status")
 def status(kid: int | None = None):
-    cur = worker.state["current"]
+    running = list(worker.state.get("running", {}).values())
+    mine = [j for j in running if j["keyword_id"] == kid] if kid else running
+    cur = (mine or running or [None])[0]
     where, args = ("WHERE keyword_id=?", (kid,)) if kid else ("", ())
     counts = {r["status"]: r["n"] for r in q(f"SELECT status, COUNT(*) n FROM jobs {where} GROUP BY status", args)}
     holds = [dict(r) for r in q(
@@ -213,7 +217,7 @@ def status(kid: int | None = None):
         f"{where + ' AND' if where else 'WHERE'} status='queued' AND next_at>? GROUP BY kind", (*args, time.time()))]
     return {
         "waiting": waiting,
-        "current": worker.describe(cur) if cur else None,
+        "current": " · ".join(worker.describe(j) for j in (mine or running)) or None,
         "current_kid": cur["keyword_id"] if cur else None,
         "note": worker.state["note"],
         "cooldown": max(0, int(worker.state["cooldown_until"] - time.time())),

@@ -70,7 +70,7 @@ def enqueue_keyword(kid, refresh=False):
     d = q("SELECT updated_at FROM meta WHERE key=?", (f"disc_{kid}",))
     seeds = len(subs) or q("SELECT 1 FROM candidates WHERE keyword_id=? LIMIT 1", (kid,))
     if seeds and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
-        _add(kid, "discover", 1)
+        _add(kid, "discover", 4)
     # 틱톡: 오늘 기록이 없으면 받음
     if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
         _add(kid, "tiktok", 1)
@@ -354,7 +354,7 @@ def do_discover(job):
         x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"disc_{kid}", "1", time.time()))
     _set(job, "done")
     if left:   # 도중에 들어온 후보가 있으면 바로 한 번 더
-        _add(kid, "discover", 1)
+        _add(kid, "discover", 4)
     enqueue_keyword(kid)
 
 
@@ -602,17 +602,29 @@ def do_global(job):
 HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
-def _next():
+# 사이트별로 줄을 따로 세워 동시에 처리(같은 사이트 안에서는 여전히 한 번에 하나)
+GROUPS = {
+    "reddit": ("totals", "mention", "discover"),
+    "youtube": ("yt", "ytc", "ytstats"),
+    "etc": ("trends", "tiktok", "global"),
+}
+
+
+def _next(kinds=None):
+    kinds = kinds or tuple(HANDLERS)
     now = time.time()
-    state["turn"] = state.get("turn", 0) + 1
+    ks = ",".join("?" * len(kinds))
     r = None
-    if state["turn"] % 3 == 0:   # 세 번에 한 번은 유튜브 댓글 수(뒤로 밀려 영영 안 받아지는 일 방지)
-        r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='ytc' ORDER BY id LIMIT 1", (now,))
+    if "ytc" in kinds:
+        state["turn"] = state.get("turn", 0) + 1
+        if state["turn"] % 3 == 0:   # 세 번에 한 번은 유튜브 댓글 수(뒤로 밀려 영영 안 받아지는 일 방지)
+            r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='ytc' ORDER BY id LIMIT 1", (now,))
     if not r:
-        r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? "
-              "ORDER BY priority, month DESC, id LIMIT 1", (now,))
+        r = q(f"SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind IN ({ks}) "
+              "ORDER BY priority, month DESC, id LIMIT 1", (now, *kinds))
     if not r:
-        r = q("SELECT * FROM jobs WHERE status='hold' AND next_at<=? ORDER BY next_at, id LIMIT 1", (now,))
+        r = q(f"SELECT * FROM jobs WHERE status='hold' AND next_at<=? AND kind IN ({ks}) "
+              "ORDER BY next_at, id LIMIT 1", (now, *kinds))
     return dict(r[0]) if r else None
 
 
@@ -639,24 +651,31 @@ def describe(j):
     return s + (f" (재시도 {j['tries']}회)" if j["tries"] else "")
 
 
-def loop():
+def loop(group="all", kinds=None):
+    cur = state["running"]
     while True:
         try:
-            job = _next()
+            job = _next(kinds)
             if not job:
-                state["current"] = None
+                cur.pop(group, None)
                 time.sleep(2)
                 continue
             job["status_before"] = job["status"]
             x("UPDATE jobs SET status='running' WHERE id=?", (job["id"],))
-            state["current"] = job
+            cur[group] = job
             HANDLERS[job["kind"]](job)
         except Exception as e:  # 예상 못 한 오류로 워커가 죽지 않게
-            if state["current"]:
+            if cur.get(group):
                 x("UPDATE jobs SET status='failed', msg=? WHERE id=?",
-                  (f"{type(e).__name__}: {e}"[:200], state["current"]["id"]))
+                  (f"{type(e).__name__}: {e}"[:200], cur[group]["id"]))
+            try:
+                x("ROLLBACK")
+            except Exception:
+                pass
             time.sleep(2)
 
 
 def start():
-    threading.Thread(target=loop, daemon=True, name="worker").start()
+    state["running"] = {}
+    for group, kinds in GROUPS.items():
+        threading.Thread(target=loop, args=(group, kinds), daemon=True, name=f"worker-{group}").start()
