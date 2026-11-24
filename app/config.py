@@ -29,7 +29,7 @@ YT_COMMENT_BATCH = 40                                          # 댓글 수를 �
 YT_COMMENT_STALE_DAYS = 30                                     # 이만큼 지나면 댓글 수를 다시 받음
 YT_MAX_PAGES = 10                                              # 검색 한 번에 최대 500개까지만 나옴 → 넘으면 기간을 쪼갬
 
-AUTO_ADD_MIN_HITS = 5                                          # 추천 서브레딧: 최근 1년 언급 글이 이만큼 이상이면 자동 추적
+AUTO_ADD_MIN_HITS = 3                                          # 추천 서브레딧: 최근 6개월 언급 글이 이만큼 이상이면 자동 추적
 AUTO_ADD_MAX = 12                                              # 키워드당 자동으로 추가하는 서브레딧 수 한도
 
 TRENDS_PROVIDER = os.environ.get("KT_TRENDS_PROVIDER", "pytrends")  # pytrends | serpapi

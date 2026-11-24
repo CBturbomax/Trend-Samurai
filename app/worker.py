@@ -319,7 +319,7 @@ def do_discover(job):
                     raise
 
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
-    since = (today() - dt.timedelta(days=365)).isoformat()
+    since = (today() - dt.timedelta(days=180)).isoformat()   # 6개월만 봄(1년은 아카이브가 자주 시간 초과)
     until = (today() + dt.timedelta(days=1)).isoformat()
     # 직접 넣어 준 후보(아직 언급 수를 안 센 것)는 먼저 확인
     seeded = [r["name"] for r in q("SELECT name FROM candidates WHERE keyword_id=? AND hits IS NULL", (kid,))
@@ -347,7 +347,7 @@ def do_discover(job):
         if not score and not seeded:   # 나중에 다시
             t = job["tries"] + 1
             return _set(job, "failed" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + 900, t)
-    order = seeded + [s_ for s_, _ in sorted(score.items(), key=lambda kv: -kv[1]) if s_ not in seeded][:20]
+    order = seeded + [s_ for s_, _ in sorted(score.items(), key=lambda kv: -kv[1]) if s_ not in seeded][:12]
     # 후보마다 최근 1년간 제목에 키워드가 몇 번 나왔는지 센 뒤, 많은 순으로 자동 추적
     results = []
     for sub in order:
@@ -355,7 +355,7 @@ def do_discover(job):
         try:
             hits = 0
             for t in terms:
-                for _ in range(8):
+                for _ in range(5):
                     try:
                         hits += len(call(arctic.search_posts, sub, t, since, until))
                         break

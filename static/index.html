@@ -349,7 +349,7 @@ function mentionCharts(d,o){
     +one('men-s','mentions','글','단위: 개/월. 같은 커뮤니티에서 제목에 키워드가 든 글 수.');
 }
 function redditManage(d){
-  const cands=d.candidates.length?`<div class="box"><b>자동 추적에서 빠진 후보</b> <span class="dim small">(언급이 적었던 곳. 필요하면 체크해 추가)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 1년 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
+  const cands=d.candidates.length?`<div class="box"><b>자동 추적에서 빠진 후보</b> <span class="dim small">(언급이 적었던 곳. 필요하면 체크해 추가)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 6개월 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
   return `<details class="manage"><summary>커뮤니티 목록 관리 (추적 중 ${d.subs.filter(x=>x.kind==='mention').length}곳)</summary><div class="panel" style="margin-top:14px">
    <div class="row">${d.subs.filter(x=>x.kind==='mention').map(x=>`<span class="chip">r/${esc(x.name)} <a href="#" class="rmsub warn" data-s="${esc(x.name)}">✕</a></span>`).join('')||'<span class="dim">없음</span>'}</div>
    ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="서브레딧 이름 (쉼표로 구분)"></label><button class="btn main" id="btnProbe">후보로 넣고 자동 선별</button><button class="btn" id="btnAddSubs">바로 추가</button></div></div></details>`;
