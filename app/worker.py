@@ -527,7 +527,7 @@ def do_yt_web(job):
     b = dt.date.fromisoformat(job["end"])
     found, capped = {}, 0
     try:
-        for t in terms:
+        for t in [terms if len(terms) > 1 else terms[0]]:   # 표기가 여럿이면 한 번의 검색으로(요청 수 감소)
             token, pages, dry = None, 0, 0
             while True:
                 for i in range(4):   # 한 페이지가 막혀도 그 페이지만 잠깐 쉬고 다시(전엔 한 번 막히면 그 달을 처음부터 다시 받아 거의 안 끝났음)

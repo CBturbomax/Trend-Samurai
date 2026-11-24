@@ -96,7 +96,10 @@ def _num(s):
 
 def search_page(term, start, end, token=None):
     """→ (영상 목록, 다음 페이지 토큰). 영상 = {id, title, channel, views, text}"""
-    q = f'"{term}"' if " " in term else term
+    if isinstance(term, (list, tuple)):   # 여러 표기를 한 번에: a | "b c"
+        q = " | ".join(f'"{t}"' if " " in t else t for t in term)
+    else:
+        q = f'"{term}"' if " " in term else term
     body = {"continuation": token} if token else {
         "query": f"{q} after:{start} before:{end}", "params": SORT_DATE_VIDEOS}
     d = _post("search", body)
