@@ -229,6 +229,8 @@ def do_mention(job):
             x("UPDATE jobs SET status='hold', next_at=?, msg='연속 실패 → 서브레딧 전체 보류(검색 미지원일 수 있음)' "
               "WHERE sub=? AND kind='mention' AND status='queued'", (later, sub))
             return _set(job, "hold", "연속 실패 → 서브레딧 전체 보류(검색 미지원일 수 있음)", later, tries)
+        if job["term"].startswith(CPFX) and tries >= 6:   # 댓글은 오래 붙잡지 말고 보류 → 다른 달 먼저
+            return _set(job, "hold", f"{e} · {tries}회 실패, 나중에 재시도", time.time() + 3600, tries)
         if tries < C.TRIES_BEFORE_SHRINK:
             return _set(job, "queued", f"{e} · 재시도 {tries}회", 0, tries)
         if days > 300:   # 해 단위가 계속 실패 → 달 단위로
