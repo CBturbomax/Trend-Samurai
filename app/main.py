@@ -26,7 +26,6 @@ async def lifespan(app):
     seed.load()   # seed/ 폴더의 키워드·틱톡 과거 추이를 채움
     if not C.PULLPUSH_ENABLED:
         x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
-    x("DELETE FROM jobs WHERE kind='mention' AND status='queued' AND julianday(end)-julianday(start)<300")
     x("UPDATE jobs SET priority=4 WHERE kind='discover' AND status='queued'")
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
