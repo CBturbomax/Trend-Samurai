@@ -318,6 +318,7 @@ def status(kid: int | None = None):
         "note": worker.state["note"],
         "cooldown": max(0, int(worker.state["cooldown_until"] - time.time())),
         "counts": counts, "holds": holds, "now": time.time(),
+        "by_kind": [dict(r) for r in q(f"SELECT kind, status, COUNT(*) n FROM jobs {where} GROUP BY kind, status", args)],
     }
 
 
