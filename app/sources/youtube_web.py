@@ -22,12 +22,45 @@ _s.headers.update({
 SORT_DATE_VIDEOS = "CAISAhAB"   # 정렬: 업로드 날짜, 유형: 동영상
 
 
+_hs = {"at": 0.0, "uses": 0}
+
+
+def _handshake():
+    """일반 브라우저처럼 첫 화면을 먼저 열어 쿠키·최신 클라이언트 버전·방문자 ID를 받음(오래된 버전·쿠키 없는 요청은 막히기 쉬움)."""
+    global _s
+    import time
+    _s = requests.Session()
+    _s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                       "Chrome/131.0 Safari/537.36", "Accept-Language": "en-US,en;q=0.9"})
+    try:
+        h = _s.get("https://www.youtube.com/?hl=en&gl=US", timeout=30).text
+        v = re.search(r'"INNERTUBE_CLIENT_VERSION":"([^"]+)"', h)
+        vd = re.search(r'"VISITOR_DATA":"([^"]+)"', h)
+        if v:
+            CTX["client"]["clientVersion"] = v.group(1)
+        if vd:
+            CTX["client"]["visitorData"] = vd.group(1)
+            _s.headers["X-Goog-Visitor-Id"] = vd.group(1)
+        _s.headers["X-Youtube-Client-Name"] = "1"
+        _s.headers["X-Youtube-Client-Version"] = CTX["client"]["clientVersion"]
+        _s.headers["Origin"] = "https://www.youtube.com"
+    except requests.RequestException:
+        pass
+    _hs["at"], _hs["uses"] = time.time(), 0
+
+
 def _post(path, body):
+    import time
+    if not _hs["at"] or _hs["uses"] >= 300 or time.time() - _hs["at"] > 3600:
+        _handshake()
+    _hs["uses"] += 1
     try:
         r = _s.post(f"{BASE}{path}?prettyPrint=false", json={"context": CTX, **body}, timeout=40)
     except requests.RequestException as e:
         raise YTError(f"연결 오류: {type(e).__name__}")
     if r.status_code != 200:
+        if r.status_code in (403, 429):
+            _hs["at"] = 0   # 다음 요청 전에 첫 화면부터 다시
         raise YTError(f"HTTP {r.status_code}")
     try:
         return r.json()
