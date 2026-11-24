@@ -94,8 +94,7 @@ def enqueue_keyword(kid, refresh=False):
             if (a, b) not in have:
                 _add(kid, "yt", 2, month=a[:7], start=a, end=b)
         _add(kid, "ytstats", 2, month="0000-00")
-        if not yt_key():
-            _add(kid, "ytc", 4, month="0000-00")
+        pass   # 유튜브 댓글 수는 수집하지 않음(정확도 낮음)
     cur = all_months()[-1]
     for s in subs:
         if s["kind"] != "mention":
@@ -487,8 +486,7 @@ def do_ytc(job):
         return _yt_fail(job, e)
     _snapshot(kid)
     _set(job, "done")
-    if len(rows) == C.YT_COMMENT_BATCH:   # 아직 남았으면 이어서
-        _add(kid, "ytc", 4, month="0000-00")
+    # 유튜브 댓글 수는 더 이상 이어서 받지 않음
 
 
 def _snapshot(kid):

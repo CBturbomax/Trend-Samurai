@@ -27,6 +27,7 @@ async def lifespan(app):
     if not C.PULLPUSH_ENABLED:
         x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
     x("UPDATE jobs SET priority=4 WHERE kind='discover' AND status='queued'")
+    x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
     worker.start()
@@ -391,8 +392,7 @@ def export_csv(kid: int):
                         "", "", c["partial"], "레딧 전체에서 전용 서브레딧을 뺀 값"])
     for m, (n, v, c) in sorted(d["youtube"]["months"].items()):
         for metric, val, note in (("youtube_videos_uploaded", n, "그 달에 올라온 영상 수"),
-                                  ("youtube_views_of_uploads", v, "그 달에 올라온 영상의 현재 누적 조회수"),
-                                  ("youtube_comments_of_uploads", c, "그 달에 올라온 영상의 현재 누적 댓글 수")):
+                                  ("youtube_views_of_uploads", v, "그 달에 올라온 영상의 현재 누적 조회수")):
             w.writerow([d["keyword"], metric, "YouTube", "", "", "", m, "" if val is None else val, "", "",
                         int(m == d["cur_month"]), note])
     for t in d["tiktok"]:
