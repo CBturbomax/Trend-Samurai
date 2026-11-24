@@ -1,8 +1,11 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && playwright install --with-deps chromium   # 틱톡 해시태그 통계용 브라우저
+# 틱톡 해시태그 통계용 브라우저(시스템 패키지의 Chromium을 그대로 씀)
+RUN apt-get update && apt-get install -y --no-install-recommends chromium \
+    && rm -rf /var/lib/apt/lists/*
+ENV KT_CHROMIUM=/usr/bin/chromium
+RUN pip install --no-cache-dir -r requirements.txt
 COPY app app
 COPY static static
 # DB는 /data 에 저장 → 호스팅 서비스에서 /data 에 볼륨(영구 디스크)을 붙일 것
