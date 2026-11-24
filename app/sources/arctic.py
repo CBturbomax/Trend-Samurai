@@ -76,6 +76,15 @@ def top_authors(sub, n=8):
     return [a for a, _ in c.most_common(n)]
 
 
+def keyword_authors(sub, term, after, n=6):
+    """그 서브레딧에서 제목에 키워드를 쓴 사람들(최근 글 100개 기준, 많이 쓴 순)."""
+    data = _get("/api/posts/search", {
+        "subreddit": sub, "title": term, "after": after, "limit": 100, "sort": "desc", "fields": "author"})
+    c = collections.Counter(d["author"] for d in data
+                            if d.get("author") not in (None, "[deleted]", "AutoModerator"))
+    return [a for a, _ in c.most_common(n)]
+
+
 def author_subreddits(author, n=20):
     data = _get("/api/users/interactions/subreddits", {
         "author": author, "limit": n, "after": "1year"})
