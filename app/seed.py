@@ -82,7 +82,10 @@ def load():
                 continue
             rows = [ln.split(",") for ln in f.read_text(encoding="utf-8").split() if "," in ln]
             for wk, v in rows:
-                x("INSERT OR REPLACE INTO tt_history VALUES(?,?,?)", (r[0]["id"], wk, float(v)))
+                try:   # 제목 줄·잘못된 줄은 건너뜀(서버 시작이 멈추지 않게)
+                    x("INSERT OR REPLACE INTO tt_history VALUES(?,?,?)", (r[0]["id"], wk, float(v)))
+                except ValueError:
+                    continue
 
     if new:
         threading.Thread(target=_add_own_subs, args=(new,), daemon=True).start()
