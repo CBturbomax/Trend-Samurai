@@ -420,6 +420,9 @@ async function pollStatus(){
      <div class="progress-bar"><div class="progress-seg done" style="width:${dp}%">${dp>=12?`완료 ${done}`:''}</div><div class="progress-seg todo" style="width:${100-dp}%">${dp<=88?`남음 ${rest}`:''}</div></div>
      <div class="progress-legend"><span><i class="swatch done"></i>완료 ${done}</span><span><i class="swatch todo"></i>남음 ${rest}</span><span>보류 ${c.hold||0} · 실패 ${c.failed||0}</span></div>
      ${s.holds.length?`<div class="box small"><b class="warn">보류·실패한 구간</b> <span class="dim">(다른 구간 먼저 진행, 나중에 자동 재시도)</span>${s.holds.map(h=>`<div>${h.sub?'r/'+esc(h.sub):'구글 트렌드'} ${h.term?`'${esc(h.term)}'`:''} ${h.first?`${h.first.slice(0,7)} ~ ${h.last.slice(0,7)}`:''} · ${h.n}개 · <span class="dim">${esc(h.msg||'')}</span>${h.next_at>s.now?` · ${Math.ceil((h.next_at-s.now)/60)}분 뒤 재시도`:''}</div>`).join('')}</div>`:''}`;
+    if(!S.hTick||Date.now()-S.hTick>30000){S.hTick=Date.now();try{S.health=await api('/api/health')}catch(e){}}
+    if(S.health){const h=S.health,src=Object.values(h.sources).filter(x=>x.n30),line=src.map(x=>`${x.name} ${Math.round(x.ok30/x.n30*100)}% 성공 (30분 ${x.n30}건${x.gap?` · ${x.gap>=60?Math.round(x.gap/60)+'분':x.gap+'초'} 간격`:''})`).join(' · ');
+      p.insertAdjacentHTML('beforeend',`<details class="manage small"><summary>자동 조절: ${esc(line||'대기 중')}</summary><div style="margin-top:8px">${h.log.slice(0,15).map(l=>`<div><span class="dim">${l.t}</span> ${esc(l.msg)}</div>`).join('')||'<span class="dim">아직 조절 내역 없음</span>'}</div></details>`)}
     if(done!==lastDone){lastDone=done;await loadData(false)}
   }catch(e){}}
   setTimeout(pollStatus,3000);

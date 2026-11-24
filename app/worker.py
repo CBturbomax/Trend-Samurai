@@ -3,6 +3,7 @@ import datetime as dt
 import threading
 import time
 
+from . import autotune
 from . import config as C
 from .db import q, x
 from .sources import arctic, pullpush, tiktok, trends, youtube, youtube_web
@@ -99,7 +100,8 @@ def enqueue_keyword(kid, refresh=False):
     for s in subs:
         if s["kind"] != "mention":
             continue
-        for t in terms + [CPFX + t for t in terms]:   # 글 제목 + 댓글 본문
+        noc = bool(q("SELECT 1 FROM meta WHERE key=?", (f"nocomment:{s['name']}",)))
+        for t in terms + ([] if noc else [CPFX + t for t in terms]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
@@ -138,10 +140,12 @@ def call(fn, *a):
         time.sleep(wait)
     try:
         r = fn(*a)
+        autotune.record("arctic", True)
         state["streak"] = 0
         state["next_ok"] = time.time() + C.ARCTIC_GAP
         return r
     except arctic.SlowDown as e:
+        autotune.record("arctic", False)
         # 422는 1초 안에 거절되는 가벼운 응답. 실측상 2초 뒤 바로 다시 보내는 편이 훨씬 잘 됨.
         # 그래도 계속 실패하면 15초→30초→…최대 10분으로 늘림.
         state["streak"] += 1
@@ -228,6 +232,9 @@ def do_mention(job):
             x("UPDATE jobs SET status='hold', next_at=?, msg='연속 실패 → 서브레딧 전체 보류(검색 미지원일 수 있음)' "
               "WHERE sub=? AND kind='mention' AND status='queued'", (later, sub))
             return _set(job, "hold", "연속 실패 → 서브레딧 전체 보류(검색 미지원일 수 있음)", later, tries)
+        if job["term"].startswith(CPFX):   # 커뮤니티별 댓글 검색 실패 횟수(자동 조절이 봄)
+            x("INSERT INTO meta VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1",
+              (f"cfail:{sub}", "1", time.time()))
         if job["term"].startswith(CPFX) and tries >= 6:   # 댓글은 오래 붙잡지 말고 보류 → 다른 달 먼저
             return _set(job, "hold", f"{e} · {tries}회 실패, 나중에 재시도", time.time() + 3600, tries)
         if tries < C.TRIES_BEFORE_SHRINK:
@@ -241,6 +248,8 @@ def do_mention(job):
             return _split(job, f"{e} → 기간 축소")
         return _set(job, "hold", f"{e} · {tries}회 실패", time.time() + 1800, tries)
     state["sub_streak"][sub] = 0
+    if job["term"].startswith(CPFX):
+        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"cok:{sub}", "1", time.time()))
     if was_hold:  # 풀렸으면 같은 서브레딧 보류분도 다시 진행
         x("UPDATE jobs SET status='queued', next_at=0 WHERE sub=? AND kind='mention' AND status='hold'", (sub,))
     _save_window(job, job["start"], job["end"], n, "done" if today() >= b else "open")
@@ -271,6 +280,7 @@ def do_trends(job):
     try:
         data = trends.fetch(terms, gprop, geo, C.START_DATE, today().isoformat())
     except trends.TrendsBlocked as e:
+        autotune.record("trends", False)
         # 구글이 429로 막으면 계속 두드릴수록 오래 막힘 → 트렌드 작업 전체를 30분, 1시간, 2시간… 뒤로 미룸
         t = job["tries"] + 1
         wait = 2400 if t < 3 else 5400   # 막히면 40분(계속이면 90분) 쉬고 재개 — 너무 길게 쉬면 400건이 안 끝남
@@ -286,7 +296,8 @@ def do_trends(job):
     x("COMMIT")
     _set(job, "done", "" if any(data.values()) else "데이터 없음(검색량 부족)")
     # 구글 트렌드는 연달아 부르면 막힘 → 다음 트렌드 요청은 1분 뒤에
-    x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status='queued' AND next_at<?", (time.time() + 180,) * 2)   # 성공 뒤 3분 간격(구글 차단 방지)
+    x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status='queued' AND next_at<?", (time.time() + autotune.gap("trends"),) * 2)
+    autotune.record("trends", True)   # 성공 뒤 3분 간격(구글 차단 방지)
 
 
 def do_discover(job):
@@ -376,7 +387,9 @@ def do_tiktok(job):
         "SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))))))
     try:
         stats = tiktok.hashtag_stats(tags)
+        autotune.record("tiktok", True)
     except tiktok.TikTokError as e:
+        autotune.record("tiktok", False)
         t = job["tries"] + 1
         wait = 1800 * t if t < 4 else 20 * 3600
         return _set(job, "hold" if t >= 4 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + wait, t)
@@ -432,7 +445,12 @@ def _ytw(fn, *a):
     if wait > 0:
         time.sleep(wait)
     try:
-        return fn(*a)
+        r = fn(*a)
+        autotune.record("youtube", True)
+        return r
+    except Exception:
+        autotune.record("youtube", False)
+        raise
     finally:
         state["ytw_next"] = time.time() + C.YT_WEB_GAP
 
@@ -686,6 +704,7 @@ def loop(group="all", kinds=None):
 
 
 def start():
+    autotune.start()
     state["running"] = {}
     for group, kinds in GROUPS.items():
         threading.Thread(target=loop, args=(group, kinds), daemon=True, name=f"worker-{group}").start()

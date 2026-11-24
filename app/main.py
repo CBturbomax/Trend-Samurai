@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config as C
-from . import db, seed, variants, worker
+from . import autotune, db, seed, variants, worker
 from .db import q, x
 from .sources import arctic, youtube
 
@@ -229,6 +229,11 @@ def set_youtube_key(body: KeyIn):
     for k in q("SELECT id FROM keywords"):
         worker.enqueue_keyword(k["id"])
     return {"ok": True}
+
+
+@app.get("/api/health")
+def health():
+    return {"sources": autotune.summary(), "log": list(autotune.LOG)}
 
 
 # ── 2) 진행 상황 ─────────────────────────────────────────
