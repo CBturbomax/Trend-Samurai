@@ -298,6 +298,27 @@ def set_youtube_key(body: KeyIn):
     return {"ok": True}
 
 
+PROBES = {   # 다른 수집 경로가 서버에서 되는지 한 번씩 확인(고정 주소만)
+    "reddit_json": "https://www.reddit.com/r/AsianBeauty/search.json?q=medicube&restrict_sr=1&sort=new&limit=5",
+    "reddit_old": "https://old.reddit.com/r/AsianBeauty/search.json?q=medicube&restrict_sr=1&sort=new&limit=5",
+    "reddit_site": "https://www.reddit.com/search.json?q=medicube&sort=new&limit=5",
+    "yt_rss": "https://www.youtube.com/feeds/videos.xml?channel_id=UC_x5XG1OV2P6uZZ5FSM9Ttw",
+}
+
+
+@app.get("/api/probe")
+def probe():
+    import requests as rq
+    out = {}
+    for k, u in PROBES.items():
+        try:
+            r = rq.get(u, headers={"User-Agent": "TrendSamurai/1.0 (personal research dashboard)"}, timeout=20)
+            out[k] = [r.status_code, r.text[:160]]
+        except Exception as e:
+            out[k] = [0, type(e).__name__]
+    return out
+
+
 @app.get("/api/health")
 def health():
     return {"sources": autotune.summary(), "log": list(autotune.LOG)}
