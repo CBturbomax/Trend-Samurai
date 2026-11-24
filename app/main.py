@@ -185,6 +185,23 @@ class KeyIn(BaseModel):
     key: str
 
 
+class TTHistIn(BaseModel):
+    keyword: str
+    rows: list[list]   # [[week 'YYYY-MM-DD', value], ...]
+
+
+@app.post("/api/tiktok/history")
+def tiktok_history(body: TTHistIn):
+    r = q("SELECT id FROM keywords WHERE name=?", (body.keyword.strip().lower(),))
+    if not r:
+        raise HTTPException(404, "키워드 없음")
+    kid = r[0]["id"]
+    x("DELETE FROM tt_history WHERE keyword_id=?", (kid,))
+    for wk, v in body.rows:
+        x("INSERT OR REPLACE INTO tt_history VALUES(?,?,?)", (kid, wk, float(v)))
+    return {"ok": True, "n": len(body.rows)}
+
+
 @app.post("/api/settings/youtube")
 def set_youtube_key(body: KeyIn):
     key = body.key.strip()
@@ -311,12 +328,15 @@ def build(kid: int):
         "SELECT day, videos, views, comments FROM yt_snapshots WHERE keyword_id=? ORDER BY day DESC LIMIT 60", (kid,))]
     yt["total"] = q("SELECT COUNT(*) n FROM yt_videos WHERE keyword_id=?", (kid,))[0]["n"]
 
+    tt_hist = [{"week": r["week"], "value": r["value"]} for r in q(
+        "SELECT week, value FROM tt_history WHERE keyword_id=? ORDER BY week", (kid,))]
     tt = {}
     for r in q("SELECT tag, day, videos, views FROM tt_snapshots WHERE keyword_id=? ORDER BY day DESC", (kid,)):
         tt.setdefault(r["tag"], []).append({"day": r["day"], "videos": r["videos"], "views": r["views"]})
 
     return {
         "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
+        "tiktok_history": tt_hist,
         "youtube": yt,
         "global": glob,
         "id": kid, "keyword": k[0]["name"], "variants": terms, "months": months,

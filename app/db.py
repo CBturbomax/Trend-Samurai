@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS yt_windows(
 CREATE TABLE IF NOT EXISTS yt_snapshots(                    -- 매일 기록하는 누적값 → 앞으로의 진짜 증가 추세
   keyword_id INTEGER, day TEXT, videos INTEGER, views INTEGER, comments INTEGER,
   PRIMARY KEY(keyword_id, day));
+CREATE TABLE IF NOT EXISTS tt_history(                       -- 틱톡 활동 지수(주간, 과거 2년) — MCP(TickerTrends) 경유로 채움
+  keyword_id INTEGER, week TEXT, value REAL, PRIMARY KEY(keyword_id, week));
 CREATE TABLE IF NOT EXISTS tt_snapshots(                    -- 틱톡 해시태그 누적값(매일 기록)
   keyword_id INTEGER, tag TEXT, day TEXT, videos INTEGER, views INTEGER,
   PRIMARY KEY(keyword_id, tag, day));
