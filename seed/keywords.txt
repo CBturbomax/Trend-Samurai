@@ -39,3 +39,76 @@ figs scrubs
 elf cosmetics
 mcobeauty
 catrice
+
+# ── 일본 상장 소비재 (2026-11-24 추가) ──
+# 리테일·패션
+muji                  # 료힌케이카쿠 7453
+uniqlo                # 패스트리테일링 9983
+donki                 # 팬퍼시픽(PPIH) 7532
+human made            # 휴먼메이드 456A
+asics                 # 아식스 7936
+onitsuka tiger        # 아식스 7936
+goldwin               # 골드윈 8111 (일본 노스페이스)
+yonex                 # 요넥스 7906
+shimano               # 시마노 7309
+g-shock               # 카시오 6952
+zojirushi             # 조지루시 7965
+# 캐릭터·게임·완구
+sanrio                # 산리오 8136
+hello kitty           # 산리오 8136
+kuromi                # 산리오 8136
+bandai                # 반다이남코 7832
+gundam                # 반다이남코 7832
+tamagotchi            # 반다이남코 7832
+one piece card game   # 반다이남코 7832
+pokemon cards         # 닌텐도 7974 (포켓몬컴퍼니 지분)
+nintendo switch       # 닌텐도 7974
+playstation           # 소니 6758
+capcom                # 캡콤 9697
+square enix           # 스퀘어에닉스 9684
+sega                  # 세가사미 6460
+konami                # 코나미 9766
+takara tomy           # 타카라토미 7867
+# 화장품
+shiseido              # 시세이도 4911
+anessa                # 시세이도 4911
+biore                 # 카오 4452
+hada labo             # 로토제약 4527
+kose                  # 코세 4922
+# 식음료·외식
+yakult                # 야쿠르트 2267
+kewpie                # 큐피 2809
+maruchan              # 동양수산 2875
+nissin                # 닛신식품 2897
+kikkoman              # 깃코만 2801
+calbee                # 가루비 2229
+ito en                # 이토엔 2593
+kura sushi            # 쿠라스시 2695 / KRUS
+sushiro               # 푸드앤라이프 3563
+
+# ── 해외 상장 소비재 (2026-11-24 추가) ──
+ugg                   # 데커스 DECK
+crocs                 # 크록스 CROX
+birkenstock           # 버켄스탁 BIRK
+celsius               # 셀시어스 CELH
+alani nu              # 셀시어스 CELH
+poppi                 # 펩시코 PEP
+yeti                  # 예티 YETI
+build-a-bear          # 빌드어베어 BBW
+gamestop              # 게임스탑 GME
+toniebox              # 토니즈 TNIE
+ulta                  # 울타뷰티 ULTA
+abercrombie           # ANF
+victoria's secret     # VSCO
+zegna                 # 제냐 ZGN
+prada                 # 프라다 1913.HK
+massimo dutti         # 인디텍스 ITX
+cava                  # 카바 CAVA
+dutch bros            # 더치브로스 BROS
+wingstop              # 윙스탑 WING
+sweetgreen            # 스위트그린 SG
+hims                  # 힘스앤허스 HIMS
+retatrutide           # 일라이릴리 LLY (차세대 비만약)
+zepbound              # 일라이릴리 LLY
+wegovy                # 노보노디스크 NVO
+ray-ban meta          # 메타 META / 에실로룩소티카
