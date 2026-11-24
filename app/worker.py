@@ -100,7 +100,7 @@ def enqueue_keyword(kid, refresh=False):
     for s in subs:
         if s["kind"] != "mention":
             continue
-        for t in terms:
+        for t in terms + [CPFX + t for t in terms]:   # 글 제목 + 댓글 본문
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
@@ -115,7 +115,7 @@ def enqueue_keyword(kid, refresh=False):
                 years.setdefault(m[:4], []).append(m)
             for y in sorted(years, reverse=True):
                 missing = [m for m in years[y] if month_bounds(m)[0] not in have]
-                if len(missing) == len(years[y]) and len(missing) > 1:   # 그 해를 통째로 안 받았으면 해 단위 요청
+                if not t.startswith(CPFX) and len(missing) == len(years[y]) and len(missing) > 1:   # 글은 해 단위로 먼저(댓글은 무거워 달 단위)
                     _add(kid, "mention", 3, sub=s["name"], term=t, month=f"{y}-12",
                          start=f"{y}-01-01", end=f"{int(y) + 1}-01-01")
                 else:
@@ -173,13 +173,23 @@ def _split(job, why):
     _set(job, "done", why)
 
 
+CPFX = "c:"   # 댓글 본문 검색어 표시
+
+
+def _search(job, after, before):
+    t = job["term"]
+    if t.startswith(CPFX):
+        return call(arctic.search_comments, job["sub"], t[len(CPFX):], after, before)
+    return call(arctic.search_posts, job["sub"], t, after, before)
+
+
 def do_mention(job):
     sub = job["sub"]
     a, b = dt.date.fromisoformat(job["start"]), dt.date.fromisoformat(job["end"])
     days = (b - a).days
     was_hold = job["status_before"] == "hold"
     try:
-        ts = call(arctic.search_posts, sub, job["term"], job["start"], job["end"])
+        ts = _search(job, job["start"], job["end"])
         n = len(ts)
         if days > 300:   # 해 단위 요청
             months = [m for m in all_months() if m[:4] == job["start"][:4]]
@@ -203,7 +213,7 @@ def do_mention(job):
         if n >= 100 and days > 1:
             return _split(job, "100건 꽉 참 → 반으로 나눔")
         while len(ts) == 100:  # 하루짜리 창인데도 100건: 이어서 받기
-            ts = call(arctic.search_posts, sub, job["term"], ts[-1] + 1, job["end"])
+            ts = _search(job, ts[-1] + 1, job["end"])
             n += len(ts)
     except arctic.BadRequest as e:
         return _set(job, "failed", str(e)[:150])

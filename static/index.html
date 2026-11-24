@@ -240,7 +240,7 @@ const UN=()=>S.unit==='daily'?{t:'하루 평균 ',u:'개/일',s:'/일',n:''}:{t:
 function sumAny(name,list,months){const pts={};months.forEach(m=>{const v=list.map(s=>s.pts[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});return{name,color:Y,bold:true,pts,mode:'avg'}}
 const ownAll=(d,idx)=>{const l=ownSeries(d,idx);if(l.length<2)return l;const t=sumAny('합계',l,d.months);if(S.unit==='daily'){t.mode='daily';t.raw={};d.months.forEach(m=>{const v=l.map(s=>s.raw[m]).filter(x=>x!=null);if(v.length)t.raw[m]=v.reduce((a,b)=>a+b,0)})}return[t,...l]};
 function sumSeries(name,list,months){const pts={};months.forEach(m=>{if(list.length&&list.every(s=>s.pts[m]!=null))pts[m]=list.reduce((a,s)=>a+s.pts[m],0)});return{name,color:Y,bold:true,pts}}
-function mentionBySub(d){const l=Object.entries(d.mentions).map(([sub,ms],i)=>({name:'r/'+sub,color:PAL[i%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,by])=>[m,Object.values(by).reduce((a,b)=>a+b,0)]))}));
+function mentionBySub(d,key){const l=Object.entries(d[key||'mentions']||{}).map(([sub,ms],i)=>({name:'r/'+sub,color:PAL[i%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,by])=>[m,Object.values(by).reduce((a,b)=>a+b,0)]))}));
   return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
 function mentionByTerm(d){const subs=Object.values(d.mentions);const l=d.variants.map((t,i)=>{const pts={};d.months.forEach(m=>{if(subs.length&&subs.every(ms=>ms[m]))pts[m]=subs.reduce((a,ms)=>a+ms[m][t],0)});return{name:t,color:PAL[i%PAL.length],pts}});
   return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
@@ -267,6 +267,7 @@ function yearTable(d){
   ownAll(d,1).forEach(s=>rows.push({label:`${s.name==='합계'?'전용 서브레딧 합계':s.name} 댓글${UN().s}`,short:'댓글'+UN().s,s}));
   ownAll(d,0).forEach(s=>rows.push({label:`${s.name==='합계'?'전용 서브레딧 합계':s.name} 글${UN().s}`,short:'글'+UN().s,s}));
   if(d.global&&d.global.enabled){const gc=globalSeries(d,'comment',true)[0],gp=globalSeries(d,'submission',true)[0];if(Object.keys(gc.pts).length)rows.push({label:'레딧 전체 언급 댓글 (월평균)',short:'전체 댓글',s:gc});if(Object.keys(gp.pts).length)rows.push({label:'레딧 전체 언급 글 (월평균)',short:'전체 글',s:gp})}
+  mentionBySub(d,'mentions_c').filter(s=>s.name==='합계'||Object.keys(d.mentions_c||{}).length===1).forEach(s=>rows.push({label:`언급 댓글 · ${s.name==='합계'?'커뮤니티 합계':s.name}`,short:'언급 댓글',s}));
   mentionBySub(d).forEach(s=>rows.push({label:`언급 글 · ${s.name}`,short:'언급 '+s.name.replace('r/','').slice(0,6),s}));
   sec('유튜브');
   if(d.youtube&&Object.keys(d.youtube.months).length){rows.push({label:'업로드 영상 수',short:'영상',s:ytSeries(d,0)});rows.push({label:'조회수 합',short:'조회',s:ytSeries(d,1)});rows.push({label:'댓글 수 합',short:'댓글',s:ytSeries(d,2)})}
@@ -333,12 +334,12 @@ function viewOwn(d){
        + chart('own-p',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'글 수',desc:'단위: '+UN().u+'. 보조 지표(지워진 글·재업로드로 출렁일 수 있음).'+UN().n,series:ownAll(d,0)});
 }
 function mentionCharts(d,o){
-  o=o||{months:d.months,cur:d.cur_month,source:'arctic-shift 글 검색',foot:'자체 계산, 공식 수치 아님.'};
+  o=o||{months:d.months,cur:d.cur_month,source:'arctic-shift',foot:'자체 계산, 공식 수치 아님.'};
   const n=Object.keys(d.mentions).length;if(!n)return '';
-  const series=mentionBySub(d);
-  return chart('men-s',{...o,title:`레딧 · 키워드 언급 글 수 (커뮤니티 ${n}곳 합계)`,
-    desc:'단위: 개/월. 이 키워드가 자주 나오는 레딧 커뮤니티를 자동으로 골라, 제목에 키워드가 든 글 수를 합친 값. 범례를 누르면 커뮤니티별 선도 볼 수 있음.',
-    series,defaultHidden:series.length>1?series.filter(x=>x.name!=='합계').map(x=>x.name):[]});
+  const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 · 키워드 언급 ${what} 수: 수집 중입니다. 최근 달부터 채워집니다.</div>`;
+    return chart(id,{...o,title:`레딧 · 키워드 언급 ${what} 수 (커뮤니티 ${n}곳 합계)`,desc,series,defaultHidden:series.length>1?series.filter(x=>x.name!=='합계').map(x=>x.name):[]})};
+  return one('men-c','mentions_c','댓글','단위: 개/월. 이 키워드가 자주 나오는 레딧 커뮤니티를 자동으로 골라, 댓글 본문에 키워드가 든 댓글 수를 합친 값. 범례를 누르면 커뮤니티별 선도 볼 수 있음.')
+    +one('men-s','mentions','글','단위: 개/월. 같은 커뮤니티에서 제목에 키워드가 든 글 수.');
 }
 function redditManage(d){
   const cands=d.candidates.length?`<div class="box"><b>자동 추적에서 빠진 후보</b> <span class="dim small">(언급이 적었던 곳. 필요하면 체크해 추가)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 1년 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';

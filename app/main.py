@@ -117,7 +117,7 @@ def create_keyword(body: KeywordIn):
         x("INSERT OR IGNORE INTO variants VALUES(?,?)", (kid, t))
     # 뺀 변형의 남은 검색 작업은 취소
     x(f"DELETE FROM jobs WHERE keyword_id=? AND kind='mention' AND status!='done' "
-      f"AND term NOT IN ({','.join('?' * len(terms))})", (kid, *terms))
+      f"AND term NOT IN ({','.join('?' * len(terms) * 2)})", (kid, *terms, *("c:" + t for t in terms)))
     for kind, subs in (("own", body.own_subs), ("mention", body.mention_subs)):
         for s in filter(None, map(_clean_sub, subs)):
             x("INSERT OR REPLACE INTO subreddits VALUES(?,?,?)", (kid, s, kind))
@@ -259,21 +259,28 @@ def build(kid: int):
         own[s] = {m: ([rows[m]["posts"], rows[m]["comments"]] if m in rows else [0, 0])
                   for m in months if first and m >= first}  # 생기기 전 달은 '없음'
 
-    pending = {(r["sub"], r["month"]) for r in q(
-        "SELECT DISTINCT sub, month FROM jobs WHERE kind='mention' AND status IN ('queued','running','hold')")}
-    mentions = {}
-    for s in (s["name"] for s in subs if s["kind"] == "mention"):
-        roots, cnt = set(), {}
-        for r in q("SELECT term,start,end,count,status FROM mention_windows WHERE sub=?", (s,)):
-            if r["term"] not in terms:
-                continue
-            m = r["start"][:7]
-            if (r["start"], r["end"]) == worker.month_bounds(m):
-                roots.add((r["term"], m))
-            if r["status"] != "split":
-                cnt[(r["term"], m)] = cnt.get((r["term"], m), 0) + (r["count"] or 0)
-        mentions[s] = {m: {tm: cnt.get((tm, m), 0) for tm in terms} for m in months
-                       if (s, m) not in pending and all((tm, m) in roots for tm in terms)}
+    def mention_counts(tms):
+        """서브레딧 → 달 → 검색어별 건수. 아직 덜 받은 달은 뺌."""
+        ph = ",".join("?" * len(tms))
+        pending = {(r["sub"], r["month"]) for r in q(
+            f"SELECT DISTINCT sub, month FROM jobs WHERE kind='mention' AND term IN ({ph}) "
+            "AND status IN ('queued','running','hold')", tms)}
+        out = {}
+        for s in (s["name"] for s in subs if s["kind"] == "mention"):
+            roots, cnt = set(), {}
+            for r in q(f"SELECT term,start,end,count,status FROM mention_windows WHERE sub=? AND term IN ({ph})",
+                       (s, *tms)):
+                m = r["start"][:7]
+                if (r["start"], r["end"]) == worker.month_bounds(m):
+                    roots.add((r["term"], m))
+                if r["status"] != "split":
+                    cnt[(r["term"], m)] = cnt.get((r["term"], m), 0) + (r["count"] or 0)
+            out[s] = {m: {tm.removeprefix("c:"): cnt.get((tm, m), 0) for tm in tms} for m in months
+                      if (s, m) not in pending and all((tm, m) in roots for tm in tms)}
+        return out
+
+    mentions = mention_counts(terms) if terms else {}
+    mentions_c = mention_counts(["c:" + t for t in terms]) if terms else {}
 
     tr = {}
     for r in q("SELECT * FROM trends WHERE batch LIKE ? ORDER BY month", (f"{kid}:%",)):
@@ -337,6 +344,7 @@ def build(kid: int):
     return {
         "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
         "tiktok_history": tt_hist,
+        "mentions_c": mentions_c,
         "youtube": yt,
         "global": glob,
         "id": kid, "keyword": k[0]["name"], "variants": terms, "months": months,
