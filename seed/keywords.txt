@@ -112,3 +112,10 @@ retatrutide           # 일라이릴리 LLY (차세대 비만약)
 zepbound              # 일라이릴리 LLY
 wegovy                # 노보노디스크 NVO
 ray-ban meta          # 메타 META / 에실로룩소티카
+
+# ── 추가 (2026-11-24 오후) ──
+sharkninja            # 샤크닌자 SN
+casio                 # 카시오 6952
+seiko                 # 세이코 8050
+citizen watch         # 시티즌 7762 (citizen만 쓰면 일반 단어라 레딧 잡음이 커서 watch 붙임)
+aritzia               # 아리치아 ATZ.TO
