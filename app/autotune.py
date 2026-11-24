@@ -14,7 +14,7 @@ from .db import q, x
 
 STATS = collections.defaultdict(lambda: collections.deque(maxlen=3000))   # source → (시각, 성공여부)
 LOG = collections.deque(maxlen=60)
-BOUNDS = {"arctic": (1.5, 12.0), "trends": (40.0, 1200.0), "youtube": (1.0, 12.0)}
+BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (1.5, 15.0)}
 GAPS = {"arctic": C.ARCTIC_GAP, "trends": 180.0, "youtube": C.YT_WEB_GAP}
 NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡"}
 
@@ -50,30 +50,40 @@ def _set_gap(src, v, why):
         x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"tune:{src}", str(v), time.time()))
 
 
+LAST = {"t": 0.0}
+
+
+def _since(src, t0):
+    v = [ok for t, ok in STATS[src] if t >= t0]
+    return len(v), sum(v)
+
+
 def tune():
-    # 레딧(아카이브): 성공률을 보고 간격 조절
-    n, ok = _window("arctic", 900)
-    if n >= 20:
+    """직전 조절 이후 '새로 생긴' 결과만 보고 판단(같은 실패를 매번 다시 세지 않음)."""
+    t0, LAST["t"] = LAST["t"] or time.time() - 300, time.time()
+    # 레딧(아카이브): 422는 서버 부하라 오래 쉬어도 안 나아짐(실측) → 1.5~4초 사이에서만 조절
+    n, ok = _since("arctic", t0)
+    if n >= 15:
         r = ok / n
-        if r >= 0.7:
-            _set_gap("arctic", GAPS["arctic"] * 0.85, f"최근 15분 성공 {r:.0%}")
-        elif r < 0.35:
-            _set_gap("arctic", GAPS["arctic"] * 1.3, f"최근 15분 성공 {r:.0%}")
-    # 구글 트렌드: 최근 1시간에 막힌 적 있으면 느리게, 계속 잘 되면 조금씩 빠르게
-    n, ok = _window("trends", 3600)
-    if n:
-        if ok < n:
-            _set_gap("trends", GAPS["trends"] * 1.5, f"최근 1시간 {n - ok}번 막힘")
-        elif n >= 5:   # 한 시간 동안 막힘 없으면 25%씩 당겨서 한계를 찾아감
-            _set_gap("trends", GAPS["trends"] * 0.75, f"최근 1시간 {n}번 연속 성공")
-    # 유튜브
-    n, ok = _window("youtube", 900)
+        if r >= 0.6:
+            _set_gap("arctic", GAPS["arctic"] * 0.85, f"최근 5분 성공 {r:.0%}")
+        elif r < 0.25:
+            _set_gap("arctic", GAPS["arctic"] * 1.2, f"최근 5분 성공 {r:.0%}")
+    # 구글 트렌드: 새로 막혔으면 느리게, 1시간 동안 막힘 없이 5번 넘게 성공하면 25% 당김
+    n_new, ok_new = _since("trends", t0)
+    n_h, ok_h = _window("trends", 3600)
+    if n_new > ok_new:
+        _set_gap("trends", GAPS["trends"] * 1.5, "방금 구글이 막음")
+    elif n_h >= 5 and ok_h == n_h:
+        _set_gap("trends", GAPS["trends"] * 0.75, f"최근 1시간 {n_h}번 연속 성공")
+    # 유튜브: 403 등 실패가 15% 넘으면 느리게, 20번 넘게 전부 성공하면 조금 당김
+    n, ok = _since("youtube", t0)
     if n >= 10:
         r = ok / n
-        if r < 0.7:
-            _set_gap("youtube", GAPS["youtube"] * 1.5, f"최근 15분 성공 {r:.0%}")
-        elif r > 0.97:
-            _set_gap("youtube", GAPS["youtube"] * 0.9, f"최근 15분 성공 {r:.0%}")
+        if r < 0.85:
+            _set_gap("youtube", GAPS["youtube"] * 1.6, f"최근 5분 성공 {r:.0%}")
+        elif r == 1 and n >= 20:
+            _set_gap("youtube", GAPS["youtube"] * 0.9, f"최근 5분 {n}번 전부 성공")
     # 댓글 검색이 한 번도 안 된 커뮤니티는 빼기
     for r in q("SELECT key, value FROM meta WHERE key LIKE 'cfail:%' AND CAST(value AS INTEGER) >= 25"):
         sub = r["key"][6:]
@@ -104,8 +114,10 @@ def _loop():
 def start():
     for src in GAPS:   # 지난번에 맞춰 둔 값으로 시작
         r = q("SELECT value FROM meta WHERE key=?", (f"tune:{src}",))
-        if r:
-            GAPS[src] = float(r[0]["value"])
+        if r:   # 지난번 값으로 시작하되 허용 범위 안으로
+            lo, hi = BOUNDS[src]
+            GAPS[src] = min(hi, max(lo, float(r[0]["value"])))
+    GAPS["trends"] = min(GAPS["trends"], 180.0)   # 예전 버그로 부풀었던 값은 3분으로 되돌림
     C.ARCTIC_GAP, C.YT_WEB_GAP = GAPS["arctic"], GAPS["youtube"]
     note(f"시작: 레딧 {GAPS['arctic']:g}초 · 유튜브 {GAPS['youtube']:g}초 · 구글 {GAPS['trends']:g}초 간격")
     threading.Thread(target=_loop, daemon=True, name="autotune").start()
