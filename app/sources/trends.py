@@ -17,14 +17,22 @@ class TrendsBlocked(Exception):
     pass
 
 
+_session = {"p": None, "uses": 0}
+
+
 def _pytrends(terms, gprop, geo, start, end):
+    """세션(쿠키)을 재사용해 요청 수를 줄임: 매번 새로 만들면 쿠키 받기 요청이 한 번 더 나감."""
     warnings.simplefilter("ignore")
     from pytrends.request import TrendReq
     try:
-        p = TrendReq(hl="en-US", tz=0, timeout=(10, 30))
+        if _session["p"] is None or _session["uses"] >= 40:
+            _session["p"], _session["uses"] = TrendReq(hl="en-US", tz=0, timeout=(10, 30)), 0
+        p = _session["p"]
+        _session["uses"] += 1
         p.build_payload(terms, timeframe=f"{start} {end}", geo=geo, gprop=gprop)
         df = p.interest_over_time()
     except Exception as e:  # pytrends는 429 등을 여러 예외로 던짐
+        _session["p"] = None   # 막혔으면 다음엔 새 세션으로
         raise TrendsBlocked(f"{type(e).__name__}: {str(e)[:120]}")
     out = {t: [] for t in terms}
     if df.empty:

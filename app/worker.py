@@ -47,6 +47,10 @@ def _add(kid, kind, priority, **kw):
       [kid, kind, priority] + [kw.get(c) for c in cols])
 
 
+# 구글 트렌드 순서: 모든 키워드의 '구글·미국'을 먼저, 그다음 유튜브·미국, 전세계 순
+TREND_PRIO = {("web", "US"): 1, ("youtube", "US"): 2, ("web", "WW"): 3, ("youtube", "WW"): 4}
+
+
 def enqueue_keyword(kid, refresh=False):
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     subs = q("SELECT name,kind FROM subreddits WHERE keyword_id=?", (kid,))
@@ -60,7 +64,7 @@ def enqueue_keyword(kid, refresh=False):
     for gprop, geo in C.TRENDS_COMBOS:
         g, r = gprop or "web", geo or "WW"
         if not q("SELECT 1 FROM trends WHERE batch=? AND updated_at>? LIMIT 1", (f"{kid}:{g}:{r}", fresh)):
-            _add(kid, "trends", 1, gprop=g, geo=r)
+            _add(kid, "trends", TREND_PRIO[(g, r)], gprop=g, geo=r)
     done = {(r["kind"], r["month"]) for r in q(
         "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
     for m in reversed(all_months() if C.PULLPUSH_ENABLED else []):

@@ -14,7 +14,7 @@ from .db import q, x
 
 STATS = collections.defaultdict(lambda: collections.deque(maxlen=3000))   # source → (시각, 성공여부)
 LOG = collections.deque(maxlen=60)
-BOUNDS = {"arctic": (1.5, 12.0), "trends": (90.0, 1200.0), "youtube": (1.0, 12.0)}
+BOUNDS = {"arctic": (1.5, 12.0), "trends": (40.0, 1200.0), "youtube": (1.0, 12.0)}
 GAPS = {"arctic": C.ARCTIC_GAP, "trends": 180.0, "youtube": C.YT_WEB_GAP}
 NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡"}
 
@@ -64,8 +64,8 @@ def tune():
     if n:
         if ok < n:
             _set_gap("trends", GAPS["trends"] * 1.5, f"최근 1시간 {n - ok}번 막힘")
-        elif n >= 6:
-            _set_gap("trends", GAPS["trends"] * 0.85, f"최근 1시간 {n}번 연속 성공")
+        elif n >= 5:   # 한 시간 동안 막힘 없으면 25%씩 당겨서 한계를 찾아감
+            _set_gap("trends", GAPS["trends"] * 0.75, f"최근 1시간 {n}번 연속 성공")
     # 유튜브
     n, ok = _window("youtube", 900)
     if n >= 10:
