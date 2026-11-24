@@ -109,6 +109,9 @@ def enqueue_keyword(kid, refresh=False):
         for a, b in wins:
             if (a, b) not in have:
                 _add(kid, "yt", 2, month=a[:7], start=a, end=b)
+        # 1차(얕게)에서 한도에 걸린 달은 전부 채운 뒤 깊게 다시(우선순위 맨 뒤)
+        for r in q("SELECT start, end FROM yt_windows WHERE keyword_id=? AND capped=2", (kid,)):
+            _add(kid, "yt", 9, month=r["start"][:7], start=r["start"], end=r["end"], gprop="deep")
         _add(kid, "ytstats", 2, month="0000-00")
         pass   # 유튜브 댓글 수는 수집하지 않음(정확도 낮음)
     cur = all_months()[-1]
@@ -566,8 +569,8 @@ def do_yt_web(job):
                 dry = dry + 1 if hit == 0 else 0
                 if not token or not vids or dry >= 2:   # 두 페이지 연속 관련 영상이 없으면 끝(뒤는 상관없는 영상뿐)
                     break
-                if pages >= C.YT_WEB_MAX_PAGES:
-                    capped = 1
+                if pages >= (C.YT_WEB_MAX_PAGES if job.get("gprop") == "deep" else C.YT_WEB_FIRST_PAGES):
+                    capped = 1 if job.get("gprop") == "deep" else 2   # 2 = 1차(얕게)에서 한도 → 나중에 깊게 다시
                     break
     except youtube.YTError as e:
         return _yt_fail(job, e)
