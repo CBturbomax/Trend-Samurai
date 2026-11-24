@@ -153,6 +153,8 @@ def add_mention_subs(kid: int, body: SubsIn):
     for s in filter(None, map(_clean_sub, body.subs)):
         x("INSERT OR IGNORE INTO subreddits VALUES(?,?,'mention')", (kid, s))
         x("DELETE FROM candidates WHERE keyword_id=? AND lower(name)=lower(?)", (kid, s))
+    # 언급 커뮤니티가 생겼으니 자동 선별은 뒤로(언급 수 세기가 먼저)
+    x("UPDATE jobs SET priority=4 WHERE keyword_id=? AND kind='discover' AND status IN ('queued','hold')", (kid,))
     worker.enqueue_keyword(kid)
     return {"ok": True}
 
