@@ -278,11 +278,13 @@ def build(kid: int):
             covered |= {m for m in months if r["start"][:7] <= m < r["end"][:7] or m == r["start"][:7]}
             yt["capped"] += r["capped"]
     agg = {r["m"]: r for r in q(
-        "SELECT substr(published,1,7) m, COUNT(*) n, SUM(views) v, SUM(comments) c, SUM(likes) l "
+        "SELECT substr(published,1,7) m, COUNT(*) n, SUM(views) v, SUM(comments) c, SUM(likes) l, "
+        "SUM(comments_at IS NOT NULL) cn "
         "FROM yt_videos WHERE keyword_id=? GROUP BY 1", (kid,))}
     for m in sorted(covered):
         r = agg.get(m)
-        yt["months"][m] = [r["n"], r["v"], r["c"]] if r else [0, 0, 0]
+        # 댓글 수는 그 달 영상의 95% 이상을 받았을 때만 보여 줌(덜 받은 달은 '없음')
+        yt["months"][m] = [r["n"], r["v"], r["c"] if (r["cn"] or 0) >= 0.95 * r["n"] else None] if r else [0, 0, 0]
     yt["top"] = [dict(r) for r in q(
         "SELECT video_id, title, channel, published, views, comments, likes FROM yt_videos "
         "WHERE keyword_id=? ORDER BY views DESC LIMIT 20", (kid,))]
@@ -306,7 +308,7 @@ def build(kid: int):
         "own": own, "mentions": mentions, "trends": trends,
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
-            "SELECT name,score FROM candidates WHERE keyword_id=? ORDER BY score DESC", (kid,))],
+            "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
     }
 
 
@@ -347,7 +349,7 @@ def export_csv(kid: int):
         for metric, val, note in (("youtube_videos_uploaded", n, "그 달에 올라온 영상 수"),
                                   ("youtube_views_of_uploads", v, "그 달에 올라온 영상의 현재 누적 조회수"),
                                   ("youtube_comments_of_uploads", c, "그 달에 올라온 영상의 현재 누적 댓글 수")):
-            w.writerow([d["keyword"], metric, "YouTube Data API", "", "", "", m, val, "", "",
+            w.writerow([d["keyword"], metric, "YouTube", "", "", "", m, "" if val is None else val, "", "",
                         int(m == d["cur_month"]), note])
     for t in d["tiktok"]:
         for r in t["rows"]:

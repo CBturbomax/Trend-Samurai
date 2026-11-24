@@ -70,6 +70,10 @@ def conn() -> sqlite3.Connection:
 
 def init():
     conn().executescript(SCHEMA)
+    try:  # 추천 서브레딧에서 최근 1년간 키워드가 실제로 언급된 글 수
+        conn().execute("ALTER TABLE candidates ADD COLUMN hits INTEGER")
+    except sqlite3.OperationalError:
+        pass
     try:  # 댓글 수를 마지막으로 받은 시각(키 없는 방식에서 영상별로 따로 받음)
         conn().execute("ALTER TABLE yt_videos ADD COLUMN comments_at TEXT")
     except sqlite3.OperationalError:

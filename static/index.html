@@ -307,7 +307,7 @@ function ytSeries(d,idx,name,color){const pts={};Object.entries((d.youtube||{}).
 function viewYoutube(d){
   const y=d.youtube||{};
   const SRC=y.official?'YouTube Data API (공식)':'YouTube 검색 (비공식)';
-  const cmt=y.official||!y.total?'':` 댓글 수는 영상마다 따로 받는 중: ${(y.with_comments||0).toLocaleString()} / ${y.total.toLocaleString()}개 완료(조회수 많은 영상부터). 다 받기 전에는 실제보다 적게 보임.`;
+  const cmt=y.official||!y.total?'':` 댓글 수는 영상마다 따로 받는 중: ${(y.with_comments||0).toLocaleString()} / ${y.total.toLocaleString()}개 완료. 최근 달부터 채우며, 다 받은 달만 차트에 표시.`;
   const o={months:d.months,cur:d.cur_month,source:SRC};
   const base='제목·설명·채널명에 키워드가 든 영상만 셈.';
   const snaps=y.snapshots||[],top=y.top||[],ch=y.channels||[];
@@ -330,14 +330,14 @@ function viewOwn(d){
 }
 function viewMention(d){
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift 글 검색',foot:'자체 계산, 공식 수치 아님. 변형별로 따로 세어 더함(한 글에 두 변형이 있으면 중복).'};
-  const cands=d.candidates.length?`<div class="box"><b>추천 서브레딧</b> <span class="dim small">(전용 서브레딧 활동 많은 사람들이 함께 활동하는 곳 · 숫자 = 겹친 사람 수)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.score}</span></label>`).join('')}</div></div>`:'';
+  const cands=d.candidates.length?`<div class="box"><b>추천 서브레딧</b> <span class="dim small">(전용 서브레딧 사람들이 함께 활동하는 곳 중 언급이 적어 자동 추적에서 빠진 곳. 필요하면 체크해 추가)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'':'최근 1년 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
   return `<section class="panel"><div class="panel-head"><h2>레딧 · 언급을 볼 서브레딧</h2></div><div class="row">${d.subs.filter(s=>s.kind==='mention').map(s=>`<span class="chip">r/${esc(s.name)} <a href="#" class="rmsub warn" data-s="${esc(s.name)}">✕</a></span>`).join('')||'<span class="dim">없음</span>'}</div>
    ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="직접 추가: transformers, ActionFigures"></label><button class="btn" id="btnAddSubs">추가하고 수집</button></div></section>`
    + mentionCharts(d,o);
 }
 function mentionCharts(d,o){
   o=o||{months:d.months,cur:d.cur_month,source:'arctic-shift 글 검색',foot:'자체 계산, 공식 수치 아님. 변형별로 따로 세어 더함(한 글에 두 변형이 있으면 중복).'};
-  return (Object.keys(d.mentions).length?chart('men-s',{...o,title:'레딧 · 다른 서브레딧 언급 (서브레딧별 월별 글 수)',desc:'단위: 개/월(제목에 키워드가 든 글). 아직 수집 안 된 달은 비어 있음.',series:mentionBySub(d)})
+  return (Object.keys(d.mentions).length?chart('men-s',{...o,title:'레딧 · 다른 서브레딧 언급 (서브레딧별 월별 글 수)',desc:'단위: 개/월(제목에 키워드가 든 글). 레딧 전체 검색은 막혀 있어, 키워드가 실제로 자주 언급되는 서브레딧을 자동으로 찾아 추적하고 그 합계를 봄. 아직 수집 안 된 달은 비어 있음.',series:mentionBySub(d)})
    + (d.variants.length>1?chart('men-t',{...o,title:'레딧 · 다른 서브레딧 언급 (변형별 월별 글 수)',desc:'단위: 개/월. 고른 서브레딧 전체 합.',series:mentionByTerm(d)}):''):'');
 }
 function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+viewOwn(d)+viewMention(d)}
@@ -384,7 +384,7 @@ function render(){
   $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span></div>
    <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
    <div class="filters">${tg([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}
-   ${tg([['US','미국'],['WW','전세계']],'geo',S.geo,'g')}
+   ${['yt','google','year'].includes(S.tab)?tg([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}
    ${tg([['total','월 합계'],['daily','하루 평균']],'unit',S.unit,'u')}
    <button id="btnLabels" class="btn pc ${S.allLabels?'main':''}">모든 점 라벨</button>
    <button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">HTML 리포트</button><button class="btn" id="btnRefresh">지금 갱신</button><button class="btn warn" id="btnDel">삭제</button></div></section>`+VIEW[S.tab](d);

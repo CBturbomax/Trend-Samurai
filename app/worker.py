@@ -66,6 +66,10 @@ def enqueue_keyword(kid, refresh=False):
         for kind in ("comment", "submission"):
             if (kind, m) not in done:
                 _add(kid, "global", 2, term=kind, month=m)
+    # 키워드가 언급되는 다른 서브레딧 자동 찾기: 일주일에 한 번
+    d = q("SELECT updated_at FROM meta WHERE key=?", (f"disc_{kid}",))
+    if any(s["kind"] == "own" for s in subs) and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
+        _add(kid, "discover", 1)
     # 틱톡: 오늘 기록이 없으면 받음
     if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
         _add(kid, "tiktok", 1)
@@ -105,10 +109,18 @@ def enqueue_keyword(kid, refresh=False):
                       (s["name"], t, m))
             have = {r["start"] for r in q(
                 "SELECT start FROM mention_windows WHERE sub=? AND term=?", (s["name"], t))}
-            for m in reversed(all_months()):
-                a, b = month_bounds(m)
-                if a not in have:
-                    _add(kid, "mention", 3, sub=s["name"], term=t, month=m, start=a, end=b)
+            years = {}
+            for m in all_months():
+                years.setdefault(m[:4], []).append(m)
+            for y in sorted(years, reverse=True):
+                missing = [m for m in years[y] if month_bounds(m)[0] not in have]
+                if len(missing) == len(years[y]) and len(missing) > 1:   # 그 해를 통째로 안 받았으면 해 단위 요청
+                    _add(kid, "mention", 3, sub=s["name"], term=t, month=f"{y}-12",
+                         start=f"{y}-01-01", end=f"{int(y) + 1}-01-01")
+                else:
+                    for m in reversed(missing):
+                        a, b = month_bounds(m)
+                        _add(kid, "mention", 3, sub=s["name"], term=t, month=m, start=a, end=b)
     if refresh:
         x("UPDATE jobs SET next_at=0 WHERE status='hold'")
     x("COMMIT")
@@ -168,6 +180,25 @@ def do_mention(job):
     try:
         ts = call(arctic.search_posts, sub, job["term"], job["start"], job["end"])
         n = len(ts)
+        if days > 300:   # 해 단위 요청
+            months = [m for m in all_months() if m[:4] == job["start"][:4]]
+            if n >= 100:  # 한 해에 100건 이상 → 달 단위로 다시
+                for m in reversed(months):
+                    _add(job["keyword_id"], "mention", 3, sub=sub, term=job["term"], month=m,
+                         start=month_bounds(m)[0], end=month_bounds(m)[1])
+                state["sub_streak"][sub] = 0
+                return _set(job, "done", "한 해 100건 이상 → 달 단위로 나눔")
+            cnt = {}
+            for t in ts:
+                k = dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime("%Y-%m")
+                cnt[k] = cnt.get(k, 0) + 1
+            for m in months:
+                ma, mb = month_bounds(m)
+                x("INSERT OR REPLACE INTO mention_windows VALUES(?,?,?,?,?,?,?)",
+                  (sub, job["term"], ma, mb, cnt.get(m, 0),
+                   "done" if today() >= dt.date.fromisoformat(mb) else "open", now_iso()))
+            state["sub_streak"][sub] = 0
+            return _set(job, "done")
         if n >= 100 and days > 1:
             return _split(job, "100건 꽉 참 → 반으로 나눔")
         while len(ts) == 100:  # 하루짜리 창인데도 100건: 이어서 받기
@@ -189,6 +220,11 @@ def do_mention(job):
             return _set(job, "hold", "연속 실패 → 서브레딧 전체 보류(검색 미지원일 수 있음)", later, tries)
         if tries < C.TRIES_BEFORE_SHRINK:
             return _set(job, "queued", f"{e} · 재시도 {tries}회", 0, tries)
+        if days > 300:   # 해 단위가 계속 실패 → 달 단위로
+            for m in reversed([m for m in all_months() if m[:4] == job["start"][:4]]):
+                _add(job["keyword_id"], "mention", 3, sub=sub, term=job["term"], month=m,
+                     start=month_bounds(m)[0], end=month_bounds(m)[1])
+            return _set(job, "done", f"{e} → 달 단위로 나눔")
         if days > C.MIN_WINDOW_DAYS:
             return _split(job, f"{e} → 기간 축소")
         return _set(job, "hold", f"{e} · {tries}회 실패", time.time() + 1800, tries)
@@ -257,10 +293,32 @@ def do_discover(job):
     except (arctic.SlowDown, arctic.BadRequest) as e:
         if not score:
             return _set(job, "failed", str(e)[:150])
+    terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
+    since = (today() - dt.timedelta(days=365)).isoformat()
+    until = (today() + dt.timedelta(days=1)).isoformat()
     x("DELETE FROM candidates WHERE keyword_id=?", (kid,))
-    for sub, sc in sorted(score.items(), key=lambda kv: -kv[1])[:15]:
-        x("INSERT OR REPLACE INTO candidates VALUES(?,?,?)", (kid, sub, sc))
+    added = q("SELECT COUNT(*) n FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))[0]["n"]
+    for sub, sc in sorted(score.items(), key=lambda kv: -kv[1])[:20]:
+        hits = None   # 그 서브레딧 제목에 키워드가 최근 1년간 몇 번 나왔는지 직접 확인
+        try:
+            hits = 0
+            for t in terms:
+                for _ in range(8):
+                    try:
+                        hits += len(call(arctic.search_posts, sub, t, since, until))
+                        break
+                    except arctic.SlowDown:
+                        continue
+        except arctic.BadRequest:
+            hits = None
+        if hits is not None and hits >= C.AUTO_ADD_MIN_HITS and added < C.AUTO_ADD_MAX:
+            x("INSERT OR IGNORE INTO subreddits VALUES(?,?,'mention')", (kid, sub))   # 언급이 많으면 자동 추적
+            added += 1
+        else:
+            x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,?,?)", (kid, sub, sc, hits))
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"disc_{kid}", "1", time.time()))
     _set(job, "done")
+    enqueue_keyword(kid)
 
 
 # ── 틱톡 ──────────────────────────────────────────────
@@ -370,7 +428,7 @@ def do_ytc(job):
     kid = job["keyword_id"]
     stale = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=C.YT_COMMENT_STALE_DAYS)).isoformat(timespec="seconds")
     rows = q("SELECT video_id FROM yt_videos WHERE keyword_id=? AND (comments_at IS NULL OR comments_at<?) "
-             "ORDER BY comments_at IS NOT NULL, views DESC LIMIT ?", (kid, stale, C.YT_COMMENT_BATCH))
+             "ORDER BY comments_at IS NOT NULL, substr(published,1,7) DESC, views DESC LIMIT ?", (kid, stale, C.YT_COMMENT_BATCH))
     try:
         for r in rows:
             d = _ytw(youtube_web.details, r["video_id"])
@@ -509,8 +567,13 @@ HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytsta
 
 def _next():
     now = time.time()
-    r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? "
-          "ORDER BY priority, month DESC, id LIMIT 1", (now,))
+    state["turn"] = state.get("turn", 0) + 1
+    r = None
+    if state["turn"] % 3 == 0:   # 세 번에 한 번은 유튜브 댓글 수(뒤로 밀려 영영 안 받아지는 일 방지)
+        r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='ytc' ORDER BY id LIMIT 1", (now,))
+    if not r:
+        r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? "
+              "ORDER BY priority, month DESC, id LIMIT 1", (now,))
     if not r:
         r = q("SELECT * FROM jobs WHERE status='hold' AND next_at<=? ORDER BY next_at, id LIMIT 1", (now,))
     return dict(r[0]) if r else None
