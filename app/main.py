@@ -166,6 +166,15 @@ def add_mention_subs(kid: int, body: SubsIn):
     return {"ok": True}
 
 
+@app.post("/api/keywords/{kid}/reddit_terms")
+def set_reddit_terms(kid: int, body: SubsIn):
+    """레딧 언급 검색에만 쓰는 추가 검색어(예: rhode)."""
+    terms = [t.strip().lower() for t in body.subs if t.strip()]
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"rterms:{kid}", json.dumps(terms), time.time()))
+    worker.enqueue_keyword(kid)
+    return {"ok": True, "terms": worker.reddit_terms(kid)}
+
+
 @app.post("/api/keywords/{kid}/probe")
 def probe_subs(kid: int, body: SubsIn):
     """후보 서브레딧을 넣으면, 키워드 언급 수를 세어 많은 곳만 자동으로 추적한다."""
@@ -393,8 +402,9 @@ def build(kid: int):
                       if (s, m) not in pending and all((tm, m) in roots for tm in tms)}
         return out
 
-    mentions = mention_counts(terms) if terms else {}
-    mentions_c = mention_counts(["c:" + t for t in terms]) if terms else {}
+    rterms = worker.reddit_terms(kid)
+    mentions = mention_counts(rterms) if rterms else {}
+    mentions_c = mention_counts(["c:" + t for t in rterms]) if rterms else {}
 
     tr = {}
     for r in q("SELECT * FROM trends WHERE batch LIKE ? ORDER BY month", (f"{kid}:%",)):

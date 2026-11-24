@@ -51,6 +51,16 @@ def _add(kid, kind, priority, **kw):
 TREND_PRIO = {("web", "US"): 1, ("youtube", "US"): 2, ("web", "WW"): 3, ("youtube", "WW"): 4}
 
 
+def reddit_terms(kid):
+    """레딧 언급 검색어 = 표기(variants) + 레딧 전용 추가 검색어(meta rterms:<kid>).
+    레딧 전용은 유튜브·구글엔 안 씀(예: 'rhode'는 레딧 뷰티 커뮤니티에선 브랜드지만 유튜브에선 로드아일랜드가 섞임)."""
+    import json
+    terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))]
+    r = q("SELECT value FROM meta WHERE key=?", (f"rterms:{kid}",))
+    extra = json.loads(r[0]["value"]) if r else []
+    return list(dict.fromkeys(extra + terms))
+
+
 def enqueue_keyword(kid, refresh=False):
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     subs = q("SELECT name,kind FROM subreddits WHERE keyword_id=?", (kid,))
@@ -107,7 +117,8 @@ def enqueue_keyword(kid, refresh=False):
             continue
         noc = bool(q("SELECT 1 FROM meta WHERE key=?", (f"nocomment:{s['name']}",)))
         comment_from = all_months()[0 if full else -C.COMMENT_MONTHS]
-        for t in terms + ([] if noc else [CPFX + t for t in terms]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
+        rt = reddit_terms(kid)
+        for t in rt + ([] if noc else [CPFX + t for t in rt]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
