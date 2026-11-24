@@ -528,7 +528,7 @@ def do_yt_web(job):
     found, capped = {}, 0
     try:
         for t in terms:
-            token, pages = None, 0
+            token, pages, dry = None, 0, 0
             while True:
                 for i in range(4):   # 한 페이지가 막혀도 그 페이지만 잠깐 쉬고 다시(전엔 한 번 막히면 그 달을 처음부터 다시 받아 거의 안 끝났음)
                     try:
@@ -543,10 +543,13 @@ def do_yt_web(job):
                             raise
                         time.sleep((5, 20, 60)[i])
                 pages += 1
+                hit = 0
                 for v in vids:   # 검색은 비슷한 단어도 끌고 오므로, 제목·설명·채널명에 키워드가 실제로 든 것만
                     if any(k in v["text"] or k.replace(" ", "") in v["text"] for k in terms):
+                        hit += v["id"] not in found
                         found[v["id"]] = v
-                if not token or not vids:
+                dry = dry + 1 if hit == 0 else 0
+                if not token or not vids or dry >= 2:   # 두 페이지 연속 관련 영상이 없으면 끝(뒤는 상관없는 영상뿐)
                     break
                 if pages >= C.YT_WEB_MAX_PAGES:
                     capped = 1
