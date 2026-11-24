@@ -292,7 +292,7 @@ def do_mention(job):
         if job["term"].startswith(CPFX):   # 커뮤니티별 댓글 검색 실패 횟수(자동 조절이 봄)
             x("INSERT INTO meta VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1",
               (f"cfail:{sub}", "1", time.time()))
-        if days > 400 and tries >= 3:   # 여러 해짜리가 계속 시간 초과 → 해 단위로
+        if days > 400 and tries >= 2:   # 여러 해짜리가 계속 시간 초과 → 해 단위로(오래 붙잡지 않음)
             _split_years(job)
             return _set(job, "done", f"{e} → 해 단위로 나눔")
         if days > 40 and tries >= 4:   # 긴 창이 계속 시간 초과 → 달 단위로
