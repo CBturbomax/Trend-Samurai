@@ -28,9 +28,11 @@ async def lifespan(app):
     if not C.PULLPUSH_ENABLED:
         x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
     # 범위 축소: 유튜브는 YT_WEB_START부터, 레딧 댓글 언급은 최근 COMMENT_MONTHS개월만 — 범위 밖 대기 작업 정리
-    x("DELETE FROM jobs WHERE kind='yt' AND status!='done' AND start<?", (C.YT_WEB_START + "-01",))
-    x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done' AND start<?",
-      (worker.all_months()[-C.COMMENT_MONTHS] + "-01",))
+    full = "(SELECT CAST(substr(key,6) AS INTEGER) FROM meta WHERE key LIKE 'full:%')"
+    x(f"DELETE FROM jobs WHERE kind='yt' AND status!='done' AND start<? AND keyword_id NOT IN {full}",
+      (C.YT_WEB_START + "-01",))
+    x(f"DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done' AND start<? "
+      f"AND keyword_id NOT IN {full}", (worker.all_months()[-C.COMMENT_MONTHS] + "-01",))
     # 언급 커뮤니티가 아직 하나도 없는 키워드는 선별을 맨 앞에서(이게 끝나야 언급 차트가 생김), 재선별은 뒤로
     x("UPDATE jobs SET priority=CASE WHEN keyword_id IN (SELECT keyword_id FROM subreddits WHERE kind='mention') "
       "THEN 4 ELSE 1 END WHERE kind='discover' AND status IN ('queued','hold')")
@@ -177,6 +179,17 @@ def delete_keyword(kid: int):
         x(f"DELETE FROM {t} WHERE keyword_id=?", (kid,))
     x("DELETE FROM trends WHERE batch LIKE ?", (f"{kid}:%",))
     x("DELETE FROM keywords WHERE id=?", (kid,))
+    return {"ok": True}
+
+
+@app.post("/api/keywords/{kid}/full")
+def full_history(kid: int):
+    """이 키워드만 유튜브·레딧 댓글 언급을 2019년부터 다 받기(우선순위는 뒤로)."""
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"full:{kid}", "1", time.time()))
+    worker.enqueue_keyword(kid)
+    x("UPDATE jobs SET priority=MAX(priority,6) WHERE keyword_id=? AND status='queued' AND "
+      "((kind='yt' AND start<?) OR (kind='mention' AND term LIKE 'c:%' AND start<?))",
+      (kid, C.YT_WEB_START + "-01", worker.all_months()[-C.COMMENT_MONTHS] + "-01"))
     return {"ok": True}
 
 
@@ -375,6 +388,7 @@ def build(kid: int):
     return {
         "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
         "tiktok_history": tt_hist,
+        "full": bool(q("SELECT 1 FROM meta WHERE key=?", (f"full:{kid}",))),
         "tiktok_src": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ttsrc:{kid}",)) or [{"value": "{}"}])[0]["value"]),
         "mentions_c": mentions_c,
         "youtube": yt,

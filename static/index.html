@@ -406,7 +406,7 @@ function render(){
    ${['yt','google','year'].includes(S.tab)?tg([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}
    ${tg([['total','월 합계'],['daily','하루 평균']],'unit',S.unit,'u')}
    <button id="btnLabels" class="btn pc ${S.allLabels?'main':''}">모든 점 라벨</button>
-   <button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">HTML 리포트</button><button class="btn" id="btnRefresh">지금 갱신</button><button class="btn warn" id="btnDel">삭제</button></div></section>`+VIEW[S.tab](d);
+   <button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">HTML 리포트</button><button class="btn" id="btnRefresh">지금 갱신</button>${d.full?'<span class="small dim">과거(2019~) 데이터 받는 중</span>':'<button class="btn" id="btnFull" title="유튜브(2019~2021)·레딧 댓글 언급(2년보다 이전)까지 받기">과거(2019~)도 받기</button>'}<button class="btn warn" id="btnDel">삭제</button></div></section>`+VIEW[S.tab](d);
 }
 
 /* ───── 진행 패널 ───── */
@@ -490,6 +490,7 @@ document.addEventListener('click',async e=>{
   else if(t.classList.contains('rmsub')){e.preventDefault();if(confirm(`r/${t.dataset.s} 을(를) 빼고 남은 수집을 취소할까요?`)){await api(`/api/keywords/${S.kid}/subs/${encodeURIComponent(t.dataset.s)}`,{method:'DELETE'});loadData()}}
   else if(t.id==='btnYtKey'){const m=$('#ytKeyMsg');m.textContent='키 확인 중…';try{await api('/api/settings/youtube',{body:{key:$('#ytKey').value}});lastDone=-1;await loadData()}catch(err){m.textContent=err.message}}
   else if(t.id==='btnCsv')location.href=`/api/keywords/${S.kid}/export.csv`;
+  else if(t.id==='btnFull'){await api(`/api/keywords/${S.kid}/full`,{});await loadData()}
   else if(t.id==='btnRefresh'){await api(`/api/keywords/${S.kid}/refresh`,{});lastDone=-1}
   else if(t.id==='btnDel'){if(confirm(`'${S.data.keyword}' 키워드와 수집 대기열을 삭제할까요?`)){await api('/api/keywords/'+S.kid,{method:'DELETE'});S.cmp.delete(S.kid);S.kid=null;S.data=null;$('#progress').style.display='none';render();loadSaved()}}
   else if(t.id==='btnHtml')exportHtml();
