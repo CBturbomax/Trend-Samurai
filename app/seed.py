@@ -64,6 +64,15 @@ def load():
         x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"seeded:{name}", "1", time.time()))
         new.append(kid)
 
+    g = SEED / "groups.tsv"   # 카테고리·국가: 아직 분류 안 된 키워드에만
+    if g.exists():
+        for line in g.read_text(encoding="utf-8").splitlines():
+            parts = line.split("\t")
+            if line.startswith("#") or len(parts) < 3:
+                continue
+            x("UPDATE keywords SET category=COALESCE(category,?), country=COALESCE(country,?) WHERE name=?",
+              (parts[1].strip(), parts[2].strip(), parts[0].strip().lower()))
+
     d = SEED / "tiktok"
     if d.exists():
         for f in sorted(d.glob("*.csv")):

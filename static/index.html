@@ -36,6 +36,15 @@ a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
 .kpi.is-done{border-top-color:var(--yellow)} .kpi.is-done .kpi-num{color:var(--yellow)}
 .kpi.is-todo{border-top-color:var(--orange)} .kpi.is-todo .kpi-num{color:var(--orange)}
 .kpi.is-blue{border-top-color:var(--blue)}
+.kgroups{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.kgroup{background:var(--panel);border:1px solid var(--line);padding:10px 12px}
+.kg-title{font-weight:800;font-size:var(--fs-note);color:var(--yellow);margin-bottom:8px}
+.kg-items{display:flex;flex-wrap:wrap;gap:6px}
+.kchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel-2);padding:4px 10px 4px 8px}
+.kchip.on{background:var(--yellow);border-color:var(--yellow)} .kchip.on .kwbtn{color:#10161c}
+.kchip .kwbtn{font-weight:700;font-size:var(--fs-note);cursor:pointer;padding:0}
+.kchip input{margin:0;cursor:pointer}
+.gsel{background:var(--panel);border:1px solid var(--line);color:var(--text);font:inherit;font-size:var(--fs-note);padding:4px 8px}
 .manage{border:1px solid var(--line);background:var(--panel);padding:14px 18px}
 .manage summary{cursor:pointer;font-weight:700;opacity:.8}
 .kpi.is-red{border-top-color:var(--up)}
@@ -114,8 +123,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
     <button class="btn main" id="btnSuggest">후보 찾기</button>
   </div>
   <div id="cand" class="panel"></div>
-  <div class="filters"><div class="toggle-group" id="saved"></div><span class="small dim" id="savedNote">저장된 키워드 없음</span></div>
-  <div class="row small" id="cmpRow"></div>
+  <div id="savedBox"></div>
 </section>
 
 <section class="kpi-strip" id="kpis"></section>
@@ -389,7 +397,9 @@ function render(){
   const d=S.data;if(!d){$('#result').innerHTML='';$('#kpis').innerHTML='';return}
   $('#kpis').innerHTML=kpis(d);
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
-  $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span></div>
+  $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span>
+   <span class="count">분류 <select class="gsel" id="gCat"><option value="">미분류</option>${CATS.map(c=>`<option ${d.category===c?'selected':''}>${c}</option>`).join('')}</select>
+   <select class="gsel" id="gCtr"><option value="">미분류</option>${CTRS.map(c=>`<option ${d.country===c?'selected':''}>${c}</option>`).join('')}</select></span></div>
    <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
    <div class="filters">${tg([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}
    ${['yt','google','year'].includes(S.tab)?tg([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}
@@ -418,11 +428,26 @@ async function loadData(force=true){
   if(!S.kid)return;S.data=await api('/api/keywords/'+S.kid+'/data');S.cmpData[S.kid]=S.data;
   const a=document.activeElement;if(force||!(a&&(a.id==='addSubs'||a.id==='ytKey'))&&!document.querySelector('details.manage[open]')&&!document.querySelector('.candck:checked'))render();
 }
+/* 저장된 키워드: 카테고리별 / 국가별로 묶어서 보여 줌 */
+const CATS=['뷰티','식음료','리테일·외식','패션·신발','스포츠·아웃도어','완구·캐릭터','게임·전자','헬스케어','생활용품'];
+const CTRS=['한국','미국','일본','중국','유럽','기타'];
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
+S.groupBy=ls('kt_group')||'category';S.kwq='';S.ks=[];
+function savedHtml(){
+  const key=S.groupBy,order=key==='category'?CATS:CTRS,f=S.kwq.trim().toLowerCase();
+  const ks=S.ks.filter(k=>!f||k.name.includes(f));
+  const groups={};ks.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
+  const names=[...order.filter(g=>groups[g]),...Object.keys(groups).filter(g=>!order.includes(g))];
+  const tg=`<div class="toggle-group">${[['category','카테고리별'],['country','국가별']].map(([k,n])=>`<button class="toggle grpby ${S.groupBy===k?'on':''}" data-g="${k}">${n}</button>`).join('')}</div>`;
+  const cmpN=S.cmp.size;
+  return `<div class="filters">${tg}<label class="search-box" style="flex:0 1 260px;min-width:180px"><input type="text" id="kwFilter" placeholder="키워드 찾기" value="${esc(S.kwq)}"></label>
+    <span class="small dim">${S.ks.length}개 · 비교 ${cmpN?cmpN+'개 선택':'하려면 ☐ 체크'}</span></div>
+   <div class="kgroups">${names.map(g=>`<div class="kgroup"><div class="kg-title">${esc(g)} <span class="dim">${groups[g].length}</span></div><div class="kg-items">${groups[g].map(k=>`<span class="kchip ${k.id===S.kid?'on':''}"><input type="checkbox" class="cmpck" value="${k.id}" ${S.cmp.has(k.id)?'checked':''} title="비교에 넣기"><button class="kwbtn" data-id="${k.id}">${esc(k.name)}</button></span>`).join('')}</div></div>`).join('')||'<span class="dim">없음</span>'}</div>`;
+}
+function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadSaved(){
-  const ks=await api('/api/keywords');
-  $('#saved').innerHTML=ks.map(k=>`<button class="toggle kwbtn ${k.id===S.kid?'on':''}" data-id="${k.id}">${esc(k.name)}</button>`).join('');$('#saved').style.display=ks.length?'':'none';$('#savedNote').textContent=ks.length?'저장된 키워드 · 눌러서 보기':'저장된 키워드 없음';
-  $('#cmpRow').innerHTML=ks.length>1?'비교: '+ks.map(k=>`<label class="ck"><input type="checkbox" class="cmpck" value="${k.id}" ${S.cmp.has(k.id)?'checked':''}>${esc(k.name)}</label>`).join(''):'';
-  if(!S.kid&&ks.length)select(ks[ks.length-1].id);
+  S.ks=await api('/api/keywords');renderSaved();
+  if(!S.kid&&S.ks.length)select(S.ks[0].id);
 }
 async function select(id){S.kid=id;lastDone=-1;S.data=null;await loadData();loadSaved()}
 
@@ -449,6 +474,7 @@ document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='reddit';select(r.id)}
   else if(t.classList.contains('kwbtn'))select(+t.dataset.id);
+  else if(t.classList.contains('grpby')){S.groupBy=t.dataset.g;ls('kt_group',S.groupBy);renderSaved()}
   else if(t.classList.contains('tab')){S.tab=t.dataset.tab;render()}
   else if(t.classList.contains('rng')){S.range=t.dataset.r;render()}
   else if(t.classList.contains('unit')){S.unit=t.dataset.u;render()}
@@ -464,7 +490,9 @@ document.addEventListener('click',async e=>{
   else if(t.id==='btnDel'){if(confirm(`'${S.data.keyword}' 키워드와 수집 대기열을 삭제할까요?`)){await api('/api/keywords/'+S.kid,{method:'DELETE'});S.cmp.delete(S.kid);S.kid=null;S.data=null;$('#progress').style.display='none';render();loadSaved()}}
   else if(t.id==='btnHtml')exportHtml();
 });
-document.addEventListener('change',async e=>{if(e.target.classList.contains('cmpck')){const id=+e.target.value;e.target.checked?S.cmp.add(id):S.cmp.delete(id);
+document.addEventListener('input',e=>{if(e.target.id==='kwFilter'){S.kwq=e.target.value;renderSaved()}});
+document.addEventListener('change',async e=>{if(e.target.classList.contains('gsel')){const c=$('#gCat').value,n=$('#gCtr').value;await api(`/api/keywords/${S.kid}/group`,{body:{category:c,country:n}});S.ks=await api('/api/keywords');renderSaved();return}
+if(e.target.classList.contains('cmpck')){const id=+e.target.value;e.target.checked?S.cmp.add(id):S.cmp.delete(id);renderSaved();
   for(const i of S.cmp)if(!S.cmpData[i])S.cmpData[i]=await api('/api/keywords/'+i+'/data');if(S.cmp.size>=2)S.tab='cmp';render()}});
 
 /* ───── 내보내기: 차트 포함 단일 HTML ───── */

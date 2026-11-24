@@ -72,6 +72,11 @@ def conn() -> sqlite3.Connection:
 
 def init():
     conn().executescript(SCHEMA)
+    for col in ("category", "country"):   # 키워드 묶음(카테고리·국가)
+        try:
+            conn().execute(f"ALTER TABLE keywords ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
     try:  # 추천 서브레딧에서 최근 1년간 키워드가 실제로 언급된 글 수
         conn().execute("ALTER TABLE candidates ADD COLUMN hits INTEGER")
     except sqlite3.OperationalError:

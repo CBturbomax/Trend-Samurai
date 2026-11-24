@@ -178,7 +178,19 @@ def refresh(kid: int):
 
 @app.get("/api/keywords")
 def keywords():
-    return [dict(r) for r in q("SELECT id,name FROM keywords ORDER BY id")]
+    return [dict(r) for r in q("SELECT id,name,category,country FROM keywords ORDER BY name")]
+
+
+class GroupIn(BaseModel):
+    category: str = ""
+    country: str = ""
+
+
+@app.post("/api/keywords/{kid}/group")
+def set_group(kid: int, body: GroupIn):
+    x("UPDATE keywords SET category=?, country=? WHERE id=?",
+      (body.category.strip() or None, body.country.strip() or None, kid))
+    return {"ok": True}
 
 
 # ── 유튜브 API 키 등록 ─────────────────────────────────────
@@ -348,7 +360,7 @@ def build(kid: int):
         "mentions_c": mentions_c,
         "youtube": yt,
         "global": glob,
-        "id": kid, "keyword": k[0]["name"], "variants": terms, "months": months,
+        "id": kid, "keyword": k[0]["name"], "category": k[0]["category"], "country": k[0]["country"], "variants": terms, "months": months,
         "cur_month": months[-1], "days_elapsed": t.day, "today": t.isoformat(),
         "own": own, "mentions": mentions, "trends": trends,
         "subs": [dict(s) for s in subs],
