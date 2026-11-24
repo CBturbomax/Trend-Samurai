@@ -530,7 +530,18 @@ def do_yt_web(job):
         for t in terms:
             token, pages = None, 0
             while True:
-                vids, token = _ytw(youtube_web.search_page, t, job["start"], job["end"], token)
+                for i in range(4):   # 한 페이지가 막혀도 그 페이지만 잠깐 쉬고 다시(전엔 한 번 막히면 그 달을 처음부터 다시 받아 거의 안 끝났음)
+                    try:
+                        vids, token = _ytw(youtube_web.search_page, t, job["start"], job["end"], token)
+                        break
+                    except youtube.YTError:
+                        if i == 3:
+                            if found:   # 받은 만큼은 저장하고 '한도 걸림'으로 표시
+                                capped = 1
+                                vids, token = [], None
+                                break
+                            raise
+                        time.sleep((5, 20, 60)[i])
                 pages += 1
                 for v in vids:   # 검색은 비슷한 단어도 끌고 오므로, 제목·설명·채널명에 키워드가 실제로 든 것만
                     if any(k in v["text"] or k.replace(" ", "") in v["text"] for k in terms):
