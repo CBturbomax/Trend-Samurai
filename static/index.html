@@ -362,6 +362,7 @@ function redditManage(d){
 }
 function viewMention(d){return mentionCharts(d)+redditManage(d)}
 function redditTotal(d){
+  if(!Object.keys(d.own).length)return '';   // 전용 커뮤니티가 없으면 아래 언급 합계와 같으므로 생략
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:'자체 계산, 공식 수치 아님. 아직 덜 받은 달은 받은 곳만 더해져 낮게 보일 수 있음.'};
   const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용·전체)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
   const mk=(id,i,key,what)=>{const l=[...own(i),...mentionParts(d,key).map(x=>({...x,name:x.name+' (언급)'}))];if(l.length<2)return '';
