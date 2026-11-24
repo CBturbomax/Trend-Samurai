@@ -14,7 +14,7 @@ from .db import q, x
 
 STATS = collections.defaultdict(lambda: collections.deque(maxlen=3000))   # source → (시각, 성공여부)
 LOG = collections.deque(maxlen=60)
-BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (1.5, 10.0)}
+BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (0.8, 10.0)}
 GAPS = {"arctic": C.ARCTIC_GAP, "trends": 180.0, "youtube": C.YT_WEB_GAP}
 NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡"}
 
