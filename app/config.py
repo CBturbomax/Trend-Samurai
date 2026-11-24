@@ -24,7 +24,7 @@ PULLPUSH_BLOCK_WAIT = 300                                      # 429 뒤 쉬는 
 
 YT_API_KEY = os.environ.get("YT_API_KEY", "")                   # 없으면 화면에서 입력한 키(DB 저장)를 씀
 YT_WEB_GAP = float(os.environ.get("KT_YT_WEB_GAP", "1.5"))      # 키 없는 방식: 요청 간격(초)
-YT_WEB_MAX_PAGES = 20                                          # 한 달·한 변형당 최대 페이지(약 800개)
+YT_WEB_MAX_PAGES = 8                                           # 한 달·한 변형당 최대 페이지(약 320개). 넘으면 "이상"으로 표시
 YT_COMMENT_BATCH = 40                                          # 댓글 수를 한 번에 몇 영상씩 받을지
 YT_COMMENT_STALE_DAYS = 30                                     # 이만큼 지나면 댓글 수를 다시 받음
 YT_MAX_PAGES = 10                                              # 검색 한 번에 최대 500개까지만 나옴 → 넘으면 기간을 쪼갬

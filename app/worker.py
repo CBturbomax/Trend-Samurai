@@ -120,10 +120,24 @@ def enqueue_keyword(kid, refresh=False):
             years = {}
             for m in all_months():
                 years.setdefault(m[:4], []).append(m)
+            if t.startswith(CPFX):   # 댓글: 최근 구간의 빈 달이 이어져 있으면 전체를 한 번에
+                am = all_months()
+                run = [m for m in am if m >= comment_from and month_bounds(m)[0] not in have]
+                if len(run) > 1 and am.index(run[-1]) - am.index(run[0]) == len(run) - 1:
+                    _add(kid, "mention", 4, sub=s["name"], term=t, month=run[-1],
+                         start=month_bounds(run[0])[0], end=month_bounds(run[-1])[1])
+                    continue
+            # 글: 통째로 빈 해들이 이어져 있으면 한 번에 묻고(100건씩 이어 받아 달별로 나눔) — 키워드·커뮤니티당 요청 1~몇 번
+            full_years = [y for y in sorted(years) if not t.startswith(CPFX) and len(years[y]) > 1
+                          and all(month_bounds(m)[0] not in have for m in years[y])]
+            if len(full_years) > 1 and [int(y) for y in full_years] == list(range(int(full_years[0]), int(full_years[-1]) + 1)):
+                _add(kid, "mention", 2, sub=s["name"], term=t, month=f"{full_years[-1]}-12",
+                     start=f"{full_years[0]}-01-01", end=f"{int(full_years[-1]) + 1}-01-01")
+                years = {y: v for y, v in years.items() if y not in full_years}
             for y in sorted(years, reverse=True):
                 missing = [m for m in years[y] if month_bounds(m)[0] not in have]
                 if not t.startswith(CPFX) and len(missing) == len(years[y]) and len(missing) > 1:   # 글은 해 단위로 먼저(댓글은 무거워 달 단위)
-                    _add(kid, "mention", 3, sub=s["name"], term=t, month=f"{y}-12",
+                    _add(kid, "mention", 2, sub=s["name"], term=t, month=f"{y}-12",
                          start=f"{y}-01-01", end=f"{int(y) + 1}-01-01")
                 elif t.startswith(CPFX):   # 댓글: 빈 달이 이어진 구간을 한 번에(최대 12개월)
                     run = [m for m in missing if m >= comment_from]
@@ -198,6 +212,15 @@ CPFX = "c:"   # 댓글 본문 검색어 표시
 MAX_PAGES = 15   # 여러 달짜리 요청에서 이어 받는 최대 횟수(1500건)
 
 
+def _split_years(job):
+    for y in range(int(job["start"][:4]), int(job["end"][:4])):
+        a, b = f"{y}-01-01", f"{y + 1}-01-01"
+        if job["start"] > a:
+            a = job["start"]
+        _add(job["keyword_id"], "mention", 5 if job["term"].startswith(CPFX) else 2, sub=job["sub"], term=job["term"],
+             month=f"{y}-12", start=a, end=min(b, job["end"]))
+
+
 def _search(job, after, before):
     t = job["term"]
     if t.startswith(CPFX):
@@ -221,6 +244,9 @@ def do_mention(job):
                 page = _search(job, page[-1] + 1, job["end"])
                 ts = ts + page
                 pages += 1
+            if len(page) == 100 and days > 400:  # 여러 해 → 해 단위로 다시
+                _split_years(job)
+                return _set(job, "done", f"{len(ts)}건 넘음 → 해 단위로 나눔")
             if len(page) == 100:  # 너무 많음 → 달 단위로 다시
                 for m in reversed(months):
                     _add(job["keyword_id"], "mention", 3 if not job["term"].startswith(CPFX) else 5, sub=sub,
@@ -266,6 +292,9 @@ def do_mention(job):
         if job["term"].startswith(CPFX):   # 커뮤니티별 댓글 검색 실패 횟수(자동 조절이 봄)
             x("INSERT INTO meta VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1",
               (f"cfail:{sub}", "1", time.time()))
+        if days > 400 and tries >= 3:   # 여러 해짜리가 계속 시간 초과 → 해 단위로
+            _split_years(job)
+            return _set(job, "done", f"{e} → 해 단위로 나눔")
         if days > 40 and tries >= 4:   # 긴 창이 계속 시간 초과 → 달 단위로
             for m in reversed([m for m in all_months() if job["start"][:7] <= m < job["end"][:7]] or [job["start"][:7]]):
                 _add(job["keyword_id"], "mention", 5 if job["term"].startswith(CPFX) else 3, sub=sub, term=job["term"],
