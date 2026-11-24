@@ -337,7 +337,8 @@ def probe():
 
 @app.get("/api/health")
 def health():
-    return {"sources": autotune.summary(), "log": list(autotune.LOG)}
+    return {"sources": autotune.summary(), "log": list(autotune.LOG), "yt_errs": worker.state.get("yt_errs", {}),
+            "yt_pause_left": max(0, int(autotune.PAUSE.get("youtube", 0) - time.time()))}
 
 
 # ── 2) 진행 상황 ─────────────────────────────────────────

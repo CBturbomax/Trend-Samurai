@@ -525,8 +525,11 @@ def _ytw(fn, *a):
         r = fn(*a)
         autotune.record("youtube", True)
         return r
-    except Exception:
+    except Exception as e:
         autotune.record("youtube", False)
+        errs = state.setdefault("yt_errs", {})
+        k = str(e)[:60]
+        errs[k] = errs.get(k, 0) + 1
         raise
     finally:
         state["ytw_next"] = time.time() + C.YT_WEB_GAP
