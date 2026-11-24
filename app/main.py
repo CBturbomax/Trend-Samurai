@@ -41,6 +41,7 @@ async def lifespan(app):
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")
+    x("UPDATE jobs SET status='queued', next_at=0, tries=0 WHERE kind='yt' AND status='hold'")   # 유튜브 보류분은 재시작 때 다시
     # 레딧 글: 해마다 따로 묻던 대기 작업을 지우고 여러 해를 한 번에 묻는 작업으로 다시 넣음
     x("DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status='queued' AND tries=0 "
       "AND julianday(end)-julianday(start) BETWEEN 300 AND 400")   # 틱톡 해시태그 일일 기록은 그만둠(의미 없음)
