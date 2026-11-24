@@ -160,9 +160,14 @@ function visMonths(ms){const n=S.range==='1y'?13:S.range==='3y'?37:ms.length;ret
    series: [{name,color,pts:{'2024-01':값|null}}]  o:{title,desc,source,foot,months,cur} */
 function chart(id,o){
   const hid=S.hidden[id]||(S.hidden[id]=new Set(o.defaultHidden||[]));
-  const months=o.daily?o.months:visMonths(o.months), series=o.series.filter(s=>!hid.has(s.name));
+  // 합산 차트: part 표시된 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
+  const parts=o.series.filter(s=>s.part),inc=parts.filter(s=>!hid.has(s.name));
+  o.series.forEach(s=>{if(s.isTotal){const pts={};o.months.forEach(m=>{const v=inc.map(p=>p.pts[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});s.pts=pts}});
+  const months=o.daily?o.months:visMonths(o.months), series=o.series.filter(s=>!s.part&&!hid.has(s.name));
   REG[id]={months,series};
-  const lg=o.series.length>1?`<div class="legend">${o.series.map(s=>`<button class="lg ${hid.has(s.name)?'off':''}" data-chart="${id}" data-s="${esc(s.name)}"><i style="background:${s.color}"></i>${esc(s.name)}</button>`).join('')}</div>`:'';
+  const chip=s=>`<button class="lg ${hid.has(s.name)?'off':''}" data-chart="${id}" data-s="${esc(s.name)}"><i style="background:${s.color}"></i>${esc(s.name)}</button>`;
+  const lg=parts.length?`<div class="legend"><span class="dim small" style="align-self:center">합계에 포함 (${inc.length}/${parts.length}) · 눌러서 빼기/넣기:</span>${parts.map(chip).join('')}</div>`
+    :o.series.length>1?`<div class="legend">${o.series.map(chip).join('')}</div>`:'';
   const empty=!series.some(s=>months.some(m=>s.pts[m]!=null));
   return `<section class="panel"><div class="panel-head"><h2>${esc(o.title)}</h2></div><p class="desc">${o.desc}</p>${lg}
    ${empty?'<div class="box dim">아직 받은 데이터가 없습니다. 수집되는 대로 표시됩니다.</div>':
@@ -246,10 +251,11 @@ function ownSeries(d,idx){ // idx 0=글, 1=댓글 → 하루 평균
 }
 const UN=()=>S.unit==='daily'?{t:'하루 평균 ',u:'개/일',s:'/일',n:''}:{t:'월별 ',u:'개/월',s:'/월',n:' 진행 중인 달은 오늘까지의 합계라 낮게 보임.'};
 function sumAny(name,list,months){const pts={};months.forEach(m=>{const v=list.map(s=>s.pts[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});return{name,color:Y,bold:true,pts,mode:'avg'}}
-const ownAll=(d,idx)=>{const l=ownSeries(d,idx);if(l.length<2)return l;const t=sumAny('합계',l,d.months);if(S.unit==='daily'){t.mode='daily';t.raw={};d.months.forEach(m=>{const v=l.map(s=>s.raw[m]).filter(x=>x!=null);if(v.length)t.raw[m]=v.reduce((a,b)=>a+b,0)})}return[t,...l]};
+const ownAll=(d,idx)=>{const l=ownSeries(d,idx);if(l.length<2)return l;if(S.unit!=='daily')return totalOf('합계',l);const t=sumAny('합계',l,d.months);if(S.unit==='daily'){t.mode='daily';t.raw={};d.months.forEach(m=>{const v=l.map(s=>s.raw[m]).filter(x=>x!=null);if(v.length)t.raw[m]=v.reduce((a,b)=>a+b,0)})}return[t,...l]};
+function totalOf(name,list){return[{name,color:Y,bold:true,isTotal:true,pts:{}},...list.map(x=>({...x,part:true}))]}
 function sumSeries(name,list,months){const pts={};months.forEach(m=>{if(list.length&&list.every(s=>s.pts[m]!=null))pts[m]=list.reduce((a,s)=>a+s.pts[m],0)});return{name,color:Y,bold:true,pts}}
-function mentionBySub(d,key){const l=Object.entries(d[key||'mentions']||{}).map(([sub,ms],i)=>({name:'r/'+sub,color:PAL[i%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,by])=>[m,Object.values(by).reduce((a,b)=>a+b,0)]))}));
-  return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
+function mentionParts(d,key,pre){return Object.entries(d[key||'mentions']||{}).map(([sub,ms],i)=>({name:(pre||'')+'r/'+sub,color:PAL[i%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,by])=>[m,Object.values(by).reduce((a,b)=>a+b,0)]))}))}
+function mentionBySub(d,key){const l=mentionParts(d,key);return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
 function mentionByTerm(d){const subs=Object.values(d.mentions);const l=d.variants.map((t,i)=>{const pts={};d.months.forEach(m=>{if(subs.length&&subs.every(ms=>ms[m]))pts[m]=subs.reduce((a,ms)=>a+ms[m][t],0)});return{name:t,color:PAL[i%PAL.length],pts}});
   return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
 const GP={web:'구글',youtube:'유튜브'},GEO={US:'미국',WW:'전세계'};
@@ -344,8 +350,8 @@ function mentionCharts(d,o){
   o=o||{months:d.months,cur:d.cur_month,source:'arctic-shift',foot:'자체 계산, 공식 수치 아님.'};
   const n=Object.keys(d.mentions).length;if(!n)return '';
   const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 · 키워드 언급 ${what} 수: 수집 중입니다. 최근 달부터 채워집니다.</div>`;
-    return chart(id,{...o,title:`레딧 · 키워드 언급 ${what} 수 (커뮤니티 ${n}곳 합계)`,desc,series,defaultHidden:series.length>1?series.filter(x=>x.name!=='합계').map(x=>x.name):[]})};
-  return one('men-c','mentions_c','댓글','단위: 개/월. 최근 2년만 수집. 이 키워드가 자주 나오는 레딧 커뮤니티를 자동으로 골라, 댓글 본문에 키워드가 든 댓글 수를 합친 값. 범례를 누르면 커뮤니티별 선도 볼 수 있음.')
+    return chart(id,{...o,title:`레딧 · 키워드 언급 ${what} 수 (커뮤니티 ${n}곳 합계)`,desc,series:totalOf('합계',mentionParts(d,key))})};
+  return one('men-c','mentions_c','댓글','단위: 개/월. 최근 2년만 수집. 이 키워드가 자주 나오는 레딧 커뮤니티들에서 댓글 본문에 키워드가 든 댓글 수를 합친 값.')
     +one('men-s','mentions','글','단위: 개/월. 같은 커뮤니티에서 제목에 키워드가 든 글 수.');
 }
 function redditManage(d){
@@ -355,7 +361,14 @@ function redditManage(d){
    ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="서브레딧 이름 (쉼표로 구분)"></label><button class="btn main" id="btnProbe">후보로 넣고 자동 선별</button><button class="btn" id="btnAddSubs">바로 추가</button></div></div></details>`;
 }
 function viewMention(d){return mentionCharts(d)+redditManage(d)}
-function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+mentionCharts(d)+viewOwn(d)+redditManage(d)}
+function redditTotal(d){
+  const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:'자체 계산, 공식 수치 아님. 아직 덜 받은 달은 받은 곳만 더해져 낮게 보일 수 있음.'};
+  const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용·전체)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
+  const mk=(id,i,key,what)=>{const l=[...own(i),...mentionParts(d,key).map(x=>({...x,name:x.name+' (언급)'}))];if(l.length<2)return '';
+    return chart(id,{...o,title:`레딧 합산 · 키워드 관련 ${what} 수`,desc:`단위: 개/월. 전용 커뮤니티의 전체 ${what} + 다른 커뮤니티에서 키워드가 언급된 ${what}를 모두 더한 값. 아래 범례를 눌러 합계에 넣을 곳·뺄 곳을 고를 수 있음.`,series:totalOf('레딧 합계',l)})};
+  return mk('rt-c',1,'mentions_c','댓글')+mk('rt-p',0,'mentions','글');
+}
+function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+redditTotal(d)+mentionCharts(d)+viewOwn(d)+redditManage(d)}
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
   const tags=d.tiktok||[],hist=d.tiktok_history||[];
