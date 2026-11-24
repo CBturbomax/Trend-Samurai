@@ -321,11 +321,10 @@ def do_discover(job):
             t = job["tries"] + 1
             return _set(job, "failed" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + 900, t)
     order = seeded + [s_ for s_, _ in sorted(score.items(), key=lambda kv: -kv[1]) if s_ not in seeded][:20]
-    x("DELETE FROM candidates WHERE keyword_id=?", (kid,))
-    added = q("SELECT COUNT(*) n FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))[0]["n"]
+    # 후보마다 최근 1년간 제목에 키워드가 몇 번 나왔는지 센 뒤, 많은 순으로 자동 추적
+    results = []
     for sub in order:
-        sc = score.get(sub, 0)
-        hits = None   # 그 서브레딧 제목에 키워드가 최근 1년간 몇 번 나왔는지 직접 확인
+        hits = None
         try:
             hits = 0
             for t in terms:
@@ -337,11 +336,18 @@ def do_discover(job):
                         continue
         except arctic.BadRequest:
             hits = None
+        results.append((sub, score.get(sub, 0), hits))
+        x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,?,?)",
+          (kid, sub, score.get(sub, 0), -1 if hits is None else hits))   # 진행 상황이 보이게 바로 기록
+    x("DELETE FROM candidates WHERE keyword_id=?", (kid,))
+    added = q("SELECT COUNT(*) n FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))[0]["n"]
+    for sub, sc, hits in sorted(results, key=lambda r: -(r[2] or 0)):
         if hits is not None and hits >= C.AUTO_ADD_MIN_HITS and added < C.AUTO_ADD_MAX:
-            x("INSERT OR IGNORE INTO subreddits VALUES(?,?,'mention')", (kid, sub))   # 언급이 많으면 자동 추적
+            x("INSERT OR IGNORE INTO subreddits VALUES(?,?,'mention')", (kid, sub))
             added += 1
         else:
-            x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,?,?)", (kid, sub, sc, hits))
+            x("INSERT OR REPLACE INTO candidates(keyword_id,name,score,hits) VALUES(?,?,?,?)",
+              (kid, sub, sc, -1 if hits is None else hits))
     x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"disc_{kid}", "1", time.time()))
     _set(job, "done")
     enqueue_keyword(kid)
