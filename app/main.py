@@ -241,6 +241,41 @@ def tiktok_history(body: TTHistIn):
     return {"ok": True, "n": len(body.rows)}
 
 
+class TrendsIn(BaseModel):
+    keyword: str
+    gprop: str = "web"        # web | youtube
+    geo: str = "US"           # US | WW
+    rows: list[list]          # [[week 'YYYY-MM-DD', value], ...] (주간 0~100)
+
+
+@app.post("/api/trends/import")
+def trends_import(body: TrendsIn):
+    """다른 경로(TickerTrends 경유 구글 트렌드 5년 주간)로 받은 값을 월평균으로 넣음. 이미 받은 구글 원자료가 있으면 건드리지 않음."""
+    r = q("SELECT id FROM keywords WHERE name=?", (body.keyword.strip().lower(),))
+    if not r:
+        raise HTTPException(404, "키워드 없음")
+    kid = r[0]["id"]
+    batch = f"{kid}:{body.gprop}:{body.geo}"
+    if q("SELECT 1 FROM trends WHERE batch=? AND adjusted=0 LIMIT 1", (batch,)):
+        return {"ok": True, "skipped": "이미 있음"}
+    term = (q("SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid LIMIT 1", (kid,)) or [{"term": body.keyword}])[0]["term"]
+    mon = {}
+    for wk, v in body.rows:
+        mon.setdefault(str(wk)[:7], []).append(float(v))
+    avg = {m: sum(v) / len(v) for m, v in mon.items()}
+    top = max(avg.values() or [0]) or 1
+    cur = worker.today().isoformat()[:7]
+    x("BEGIN")
+    x("DELETE FROM trends WHERE batch=?", (batch,))
+    for m, v in sorted(avg.items()):
+        x("INSERT OR REPLACE INTO trends VALUES(?,?,?,?,?,?,?,1,?)",
+          (batch, term, body.gprop, body.geo, m, round(v / top * 100, 1), int(m == cur), worker.now_iso()))
+    x("UPDATE jobs SET status='done', msg='TickerTrends 경유로 채움' WHERE keyword_id=? AND kind='trends' AND gprop=? AND geo=? AND status!='done'",
+      (kid, body.gprop, body.geo))
+    x("COMMIT")
+    return {"ok": True, "months": len(avg)}
+
+
 @app.post("/api/settings/youtube")
 def set_youtube_key(body: KeyIn):
     key = body.key.strip()
