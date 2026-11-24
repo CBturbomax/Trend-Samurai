@@ -281,18 +281,28 @@ def do_discover(job):
     kid = job["keyword_id"]
     mine = {r["name"].lower() for r in q("SELECT name FROM subreddits WHERE keyword_id=?", (kid,))}
     score = {}
+
+    def retry(fn, *a):   # 422가 흔해서 몇 번 다시 시도
+        for i in range(8):
+            try:
+                return call(fn, *a)
+            except arctic.SlowDown:
+                if i == 7:
+                    raise
+
     try:
         for own in q("SELECT name FROM subreddits WHERE keyword_id=? AND kind='own'", (kid,)):
-            for author in call(arctic.top_authors, own["name"]):
+            for author in retry(arctic.top_authors, own["name"]):
                 try:
-                    for sub, _ in call(arctic.author_subreddits, author):
+                    for sub, _ in retry(arctic.author_subreddits, author):
                         if sub.lower() not in mine and not sub.startswith("u_"):
                             score[sub] = score.get(sub, 0) + 1
                 except arctic.SlowDown:
                     continue
     except (arctic.SlowDown, arctic.BadRequest) as e:
-        if not score:
-            return _set(job, "failed", str(e)[:150])
+        if not score:   # 나중에 다시
+            t = job["tries"] + 1
+            return _set(job, "failed" if t >= 5 else "queued", f"{e} · 재시도 {t}회"[:150], time.time() + 900, t)
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     since = (today() - dt.timedelta(days=365)).isoformat()
     until = (today() + dt.timedelta(days=1)).isoformat()
