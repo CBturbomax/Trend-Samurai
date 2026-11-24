@@ -507,7 +507,7 @@ def _yt_store(kid, key, ids, terms):
 
 
 def _ytw(fn, *a):
-    wait = state.get("ytw_next", 0) - time.time()
+    wait = max(state.get("ytw_next", 0), autotune.PAUSE.get("youtube", 0)) - time.time()
     if wait > 0:
         time.sleep(wait)
     try:
