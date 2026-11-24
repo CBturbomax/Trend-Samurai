@@ -27,7 +27,9 @@ async def lifespan(app):
     seed.load()   # seed/ 폴더의 키워드·틱톡 과거 추이를 채움
     if not C.PULLPUSH_ENABLED:
         x("DELETE FROM jobs WHERE kind='global' AND status!='done'")
-    x("UPDATE jobs SET priority=4 WHERE kind='discover' AND status='queued'")
+    # 언급 커뮤니티가 아직 하나도 없는 키워드는 선별을 맨 앞에서(이게 끝나야 언급 차트가 생김), 재선별은 뒤로
+    x("UPDATE jobs SET priority=CASE WHEN keyword_id IN (SELECT keyword_id FROM subreddits WHERE kind='mention') "
+      "THEN 4 ELSE 1 END WHERE kind='discover' AND status IN ('queued','hold')")
     for (g, r), pr in worker.TREND_PRIO.items():
         x("UPDATE jobs SET priority=? WHERE kind='trends' AND gprop=? AND geo=? AND status IN ('queued','hold')", (pr, g, r))
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")

@@ -75,7 +75,7 @@ def enqueue_keyword(kid, refresh=False):
     d = q("SELECT updated_at FROM meta WHERE key=?", (f"disc_{kid}",))
     seeds = len(subs) or q("SELECT 1 FROM candidates WHERE keyword_id=? LIMIT 1", (kid,))
     if seeds and (not d or time.time() - d[0]["updated_at"] > 7 * 86400):
-        _add(kid, "discover", 4)
+        _add(kid, "discover", 4 if any(s["kind"] == "mention" for s in subs) else 1)
     # 틱톡: 오늘 기록이 없으면 받음
     if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
         _add(kid, "tiktok", 1)
@@ -381,7 +381,7 @@ def do_discover(job):
         x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"disc_{kid}", "1", time.time()))
     _set(job, "done")
     if left:   # 도중에 들어온 후보가 있으면 바로 한 번 더
-        _add(kid, "discover", 4)
+        _add(kid, "discover", 1)
     enqueue_keyword(kid)
 
 
