@@ -350,22 +350,19 @@ function viewMention(d){return mentionCharts(d)+redditManage(d)}
 function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+mentionCharts(d)+viewOwn(d)+redditManage(d)}
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
-  const tags=d.tiktok||[];
-  const hist=d.tiktok_history||[];
-  const histChart=hist.length>1?chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,title:'틱톡 · 게시물 활동 지수 (주간, 최근 2년)',desc:'단위: 상대 지수. 그 주 틱톡에서 이 키워드가 얼마나 얘기됐는지. 절대 게시물 수가 아니라 추세를 보는 값.',foot:'TickerTrends 집계. 주 = 월요일 시작.',source:'TickerTrends (TikTok)',series:[{name:'활동 지수',color:PAL[3],pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]}):'';
-  if(!tags.length&&!hist.length)return '<div class="box dim">아직 받은 틱톡 데이터가 없습니다.</div>';
+  const tags=d.tiktok||[],hist=d.tiktok_history||[];
+  const histChart=hist.length>1?chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,title:'틱톡 · 게시물 활동 지수 (주간, 최근 2년)',
+    desc:'단위: 상대 지수. 그 주 틱톡에서 이 키워드가 얼마나 얘기됐는지. 절대 게시물 수가 아니라 추세를 보는 값.',
+    foot:'TickerTrends 집계, 주 = 월요일 시작.',source:'TickerTrends (TikTok)',series:[{name:'활동 지수',color:PAL[3],pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]}):'';
   const days=[...new Set(tags.flatMap(t=>t.rows.map(r=>r.day)))].sort();
-  const mk=(f)=>tags.map((t,i)=>({name:'#'+t.tag,color:PAL[i%PAL.length],pts:Object.fromEntries(t.rows.map(r=>[r.day,r[f]]))}));
-  const inc=(f)=>tags.map((t,i)=>{const r=[...t.rows].reverse(),pts={};for(let k=1;k<r.length;k++)pts[r[k].day]=r[k][f]-r[k-1][f];return{name:'#'+t.tag,color:PAL[i%PAL.length],pts}});
-  const o={daily:true,months:days,cur:null,source:'TikTok 해시태그 페이지 (비공식)',foot:'전세계 합계(지역 구분 없음). 하루 한 번 기록.'};
-  if(!tags.length)return histChart;
-  const note=days.length<2?` <b class="warn">기록 ${days.length}일째라 아직 점 하나뿐. 날마다 한 점씩 이어짐.</b>`:'';
-  return (days.length>1?chart('tt-dv',{...o,months:days.slice(1),title:'틱톡 · 하루에 새로 올라온 게시물 수',desc:'단위: 개/일. 해시태그가 달린 게시물이 전날보다 얼마나 늘었는지.',series:inc('videos')})
-      +chart('tt-dw',{...o,months:days.slice(1),title:'틱톡 · 하루에 늘어난 조회수',desc:'단위: 회/일. 해시태그 누적 조회수가 전날보다 얼마나 늘었는지.',series:inc('views')}):'')
-    +chart('tt-v',{...o,title:'틱톡 · 해시태그 게시물 수 (누적)',desc:'단위: 개. 그날까지 그 해시태그로 올라온 게시물 총수.'+note,series:mk('videos')})
-    +chart('tt-w',{...o,title:'틱톡 · 해시태그 조회수 (누적)',desc:'단위: 회. 그날까지의 누적 조회수.'+note,series:mk('views')})
-    +histChart
-    +'<div class="box small dim">누적 차트: 틱톡은 과거 추이를 로그인 없이는 주지 않습니다(추세 페이지가 로그인 필요). 그래서 '+days[0]+'부터 매일 기록한 값으로 시계열을 만들고, 과거 구간은 없습니다.</div>';
+  if(!histChart&&days.length<2)return '<div class="box dim">아직 틱톡 시계열이 없습니다.</div>';
+  if(days.length<2)return histChart;   // 해시태그 누적값은 이틀 이상 쌓여야 선이 됨
+  const mk=f=>tags.map((t,i)=>({name:'#'+t.tag,color:PAL[i%PAL.length],pts:Object.fromEntries(t.rows.map(r=>[r.day,r[f]]))}));
+  const inc=f=>tags.map((t,i)=>{const r=[...t.rows].reverse(),pts={};for(let k=1;k<r.length;k++)pts[r[k].day]=r[k][f]-r[k-1][f];return{name:'#'+t.tag,color:PAL[i%PAL.length],pts}});
+  const o={daily:true,cur:null,source:'TikTok 해시태그 페이지 (비공식)',foot:'전세계 합계. '+days[0]+'부터 하루 한 번 기록.'};
+  return histChart
+    +chart('tt-dv',{...o,months:days.slice(1),title:'틱톡 · 하루에 새로 올라온 게시물 수',desc:'단위: 개/일. 해시태그 게시물이 전날보다 늘어난 수.',series:inc('videos')})
+    +chart('tt-dw',{...o,months:days.slice(1),title:'틱톡 · 하루에 늘어난 조회수',desc:'단위: 회/일.',series:inc('views')});
 }
 function viewGoogle(d){return trendChart(d,'web')}
 function viewCompare(){
