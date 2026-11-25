@@ -552,7 +552,7 @@ function savedHtml(){
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span>신고가 ${nh} · 근접 ${al.length-nh} · 최근 완료 기간 기준</span></div>
    <div class="table-wrap al-wrap"><table class="data-table al-table"><thead><tr><th>키워드</th><th>지표</th><th>상태</th><th>기간</th></tr></thead><tbody>${al.flatMap(r=>r.alerts.map((a,j)=>`<tr class="kwbtn al-tr" data-id="${r.id}"><td>${j?'':esc(r.keyword)}</td><td>${esc(a.metric)}</td><td class="${a.kind==='high'?'up':'nr'}">${a.kind==='high'?'신고가':'최고 대비 '+a.pct+'%'}</td><td>${esc(a.at)}</td></tr>`)).join('')}</tbody></table></div></section>`:'';
   return abox+`<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
-     <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
+     <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
    ${f?'':`<div class="kcats">${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
      return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><small>${S.sortBy==='score'?k.score:''}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
@@ -612,7 +612,7 @@ document.addEventListener('click',async e=>{
   else if(t.id==='btnRefresh'){await api(`/api/keywords/${S.kid}/refresh`,{});lastDone=-1}
   else if(t.id==='btnDel'){if(confirm(`'${S.data.keyword}' 키워드와 수집 대기열을 삭제할까요?`)){await api('/api/keywords/'+S.kid,{method:'DELETE'});S.sel=S.sel.filter(x=>x!==S.kid);S.kid=S.sel[0]||null;S.data=null;$('#progress').style.display='none';render();loadSaved()}}
   else if(t.id==='btnHtml')exportHtml();
-  else if(t.id==='btnSelClear'){S.sel=[S.kid];renderSaved();render()}
+  else if(t.id==='btnSelClear'){S.sel=[];S.kid=null;S.data=null;$('#progress').style.display='none';renderSaved();render()}
 });
 document.addEventListener('input',e=>{if(e.target.id==='kwFilter'){S.kwq=e.target.value;renderSaved()}});
 document.addEventListener('change',async e=>{if(e.target.classList.contains('gsel')){const c=$('#gCat').value,n=$('#gCtr').value;await api(`/api/keywords/${S.kid}/group`,{body:{category:c,country:n}});S.ks=await api('/api/keywords');renderSaved();return}
