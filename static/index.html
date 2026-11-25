@@ -385,8 +385,8 @@ function mentionCharts(d,o){
   const n=Object.keys(d.mentions).length;if(!n)return '';
   const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 언급 ${what} 수 · 수집 중</div>`;
     return chart(id,{...o,title:`레딧 · 키워드 언급 ${what} 수 (커뮤니티 ${n}곳 합계)`,desc,series:totalOf('합계',mentionParts(d,key))})};
-  return one('men-s','mentions','글','단위: 개/월. 같은 커뮤니티에서 제목에 키워드가 든 글 수.')
-    +one('men-c','mentions_c','댓글','단위: 개/월. 최근 2년만 수집. 이 키워드가 자주 나오는 레딧 커뮤니티들에서 댓글 본문에 키워드가 든 댓글 수를 합친 값.');
+  return one('men-s','mentions','글','개/월')
+    +one('men-c','mentions_c','댓글','개/월');
 }
 function redditManage(d){
   const cands=d.candidates.length?`<div class="box"><b>후보</b><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 6개월 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
