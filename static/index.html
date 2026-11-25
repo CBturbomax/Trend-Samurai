@@ -649,12 +649,14 @@ function savedHtml(){
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
   const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수','핀터레스트 검색'];
   const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'},'핀터레스트 검색':{c:'#E60023',i:ICO.pin,t:'검색'}};
-  const cell=a=>!a?'<td class="mx-n">·</td>':a.kind==='high'?'<td class="mx-h">신고가</td>':`<td class="mx-p">${a.pct}%</td>`;
+  const MT={'구글 검색':'google','유튜브 검색':'yt','레딧 글 수':'reddit','틱톡 조회수':'tiktok','핀터레스트 검색':'pin'};
+  const cell=(a,m)=>!a?'<td class="mx-n">·</td>':a.kind==='high'?`<td class="mx-h" data-t="${MT[m]}">신고가</td>`:`<td class="mx-p" data-t="${MT[m]}">${a.pct}%</td>`;
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
    <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
    <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="mh" title="${m}" style="--pc:${MC[m].c}">${MC[m].i}<span>${MC[m].t}</span></th>`).join('')}<th class="r">기준</th></tr></thead>
    <tbody>${al.map(r=>{const by=Object.fromEntries(r.alerts.map(a=>[a.metric,a]));const at=r.alerts.map(a=>a.at.slice(0,7)).sort().pop();
-     return `<tr class="kwbtn" data-id="${r.id}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m])).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
+     const first=MET.find(m=>by[m]&&by[m].kind==='high')||MET.find(m=>by[m]);
+     return `<tr class="mxrow" data-id="${r.id}" data-t="${MT[first]||'reddit'}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m],m)).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
   return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
    ${f?'':`<div class="kcats"><button class="kcat ${S.cat==='전체'?'on':''}" data-cat="전체">전체<span>${all.length}</span></button>${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
@@ -700,7 +702,11 @@ const split=s=>(s||'').split(',').map(x=>x.trim()).filter(Boolean);
 const vals=sel=>[...document.querySelectorAll(sel+':checked')].map(x=>x.value);
 
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('button,tr.kwbtn')||e.target;   // 버튼 안의 글자·아이콘을 눌러도 버튼으로 인식
+  // 신고가 모니터: 그 키워드 하나만 골라 해당 플랫폼 차트로 이동(누른 칸의 플랫폼, 아니면 신고가 난 플랫폼)
+  const row=e.target.closest('tr.mxrow');
+  if(row){const td=e.target.closest('td[data-t]');S.tab=(td||row).dataset.t;S.sel=[];await select(+row.dataset.id);
+    const r=$('#result');if(r)window.scrollTo({top:r.getBoundingClientRect().top+scrollY-8,behavior:'smooth'});return}
+  const t=e.target.closest('button')||e.target;   // 버튼 안의 글자·아이콘을 눌러도 버튼으로 인식
   if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='reddit';select(r.id)}
   else if(t.closest('.kcat')){S.cat=t.closest('.kcat').dataset.cat;renderSaved()}
   else if(t.classList.contains('sortby')){S.sortBy=t.dataset.o;ls('kt_sort',S.sortBy);renderSaved()}
