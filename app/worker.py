@@ -269,11 +269,16 @@ def do_mention(job):
             months = [m for m in all_months() if job["start"][:7] <= m and month_bounds(m)[1] <= max(job["end"], month_bounds(job["start"][:7])[1])]
             page = ts
             pages = 1
+            broke = False
             while len(page) == 100 and pages < MAX_PAGES:
-                page = _search_retry(job, page[-1] + 1, job["end"])
+                try:
+                    page = _search_retry(job, page[-1] + 1, job["end"])
+                except arctic.SlowDown:   # 중간에 막힘 → 받아 둔 끝난 달은 저장하고 나머지는 다음에(처음부터 다시 받지 않음)
+                    broke = True
+                    break
                 ts = ts + page
                 pages += 1
-            if len(page) == 100:  # 다 못 받음 → 받은 것 중 '끝난 달'은 저장하고, 나머지 기간만 다음 작업으로(전엔 전부 버림)
+            if len(page) == 100 or broke:  # 다 못 받음 → 받은 것 중 '끝난 달'은 저장하고, 나머지 기간만 다음 작업으로(전엔 전부 버림)
                 last_m = dt.datetime.fromtimestamp(ts[-1], dt.timezone.utc).strftime("%Y-%m")
                 cnt = {}
                 for t in ts:
