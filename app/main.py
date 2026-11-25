@@ -421,6 +421,19 @@ def probe():
     return out
 
 
+@app.get("/api/probe_pin")
+def probe_pin(path: str = "metrics/", qs: str = ""):
+    """핀터레스트 트렌드 접근 확인용(trends.pinterest.com 고정)."""
+    import requests as rq
+    u = "https://trends.pinterest.com/" + path.lstrip("/") + ("?" + qs if qs else "")
+    try:
+        r = rq.get(u, headers={"User-Agent": "Mozilla/5.0 (TrendSamurai personal research)", "Accept": "application/json, text/plain, */*",
+                               "Referer": "https://trends.pinterest.com/"}, timeout=25)
+        return {"url": u, "code": r.status_code, "ct": r.headers.get("content-type"), "body": r.text[:3000]}
+    except Exception as e:
+        return {"url": u, "err": type(e).__name__}
+
+
 @app.get("/api/health")
 def health():
     return {"sources": autotune.summary(), "log": list(autotune.LOG), "yt_errs": worker.state.get("yt_errs", {}),
