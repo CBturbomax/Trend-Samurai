@@ -193,6 +193,22 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .al-table td:first-child{font-weight:800;color:#fff}
 .al-table td.up{color:#3fb950}.al-table td.nr{color:#d9b84a}
 .al-tr{cursor:pointer}.al-tr:hover td{background:rgba(255,255,255,.03)}
+.al-head{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.al-head h3{font-size:14px;font-weight:800;letter-spacing:.02em;margin:0 10px 0 0;color:#fff}
+.al-k1{font-size:18px;font-weight:800;color:#3fb950;font-variant-numeric:tabular-nums}.al-k2{font-size:18px;font-weight:800;color:#d9b84a;margin-left:6px;font-variant-numeric:tabular-nums}
+.al-l{font-size:12px;color:#7d8996}
+.al-wrap{max-height:248px;overflow:auto;border:1px solid var(--line);background:#0f1419;scrollbar-width:thin;scrollbar-color:#2e3a46 transparent}
+.al-wrap::-webkit-scrollbar{width:8px}.al-wrap::-webkit-scrollbar-thumb{background:#2e3a46}
+.mx{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}
+.mx col.c-k{width:22%}.mx col.c-c{width:14%}.mx col.c-m{width:13%}.mx col.c-d{width:12%}
+.mx th{position:sticky;top:0;background:#161d24;color:#8b96a2;font-size:11px;font-weight:700;letter-spacing:.04em;text-align:left;padding:7px 12px;border-bottom:1px solid var(--line)}
+.mx th.r,.mx td.r{text-align:right}
+.mx td{padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mx tr{cursor:pointer}.mx tbody tr:hover td{background:rgba(255,255,255,.035)}
+.mx-k{font-weight:800;color:#fff}.mx-c{color:#7d8996;font-size:12px}.mx-d{color:#8b96a2;font-variant-numeric:tabular-nums;font-size:12px}
+.mx td.mx-h,.mx td.mx-p,.mx td.mx-n{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.mx td.mx-h{color:#3fb950;background:rgba(63,185,80,.08)}.mx td.mx-p{color:#d9b84a}.mx td.mx-n{color:#3a4550}
+@media(max-width:640px){.mx col.c-c{width:0}.mx th:nth-child(2),.mx td:nth-child(2){display:none}.mx col.c-k{width:28%}.mx th,.mx td{padding:6px 6px;font-size:11px}}
 </style>
 </head>
 <body>
@@ -549,8 +565,13 @@ function savedHtml(){
   const list=f?all.filter(k=>k.name.includes(f)):groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
-  const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span>신고가 ${nh} · 근접 ${al.length-nh} · 최근 완료 기간 기준</span></div>
-   <div class="table-wrap al-wrap"><table class="data-table al-table"><thead><tr><th>키워드</th><th>지표</th><th>상태</th><th>기간</th></tr></thead><tbody>${al.flatMap(r=>r.alerts.map((a,j)=>`<tr class="kwbtn al-tr" data-id="${r.id}"><td>${j?'':esc(r.keyword)}</td><td>${esc(a.metric)}</td><td class="${a.kind==='high'?'up':'nr'}">${a.kind==='high'?'신고가':'최고 대비 '+a.pct+'%'}</td><td>${esc(a.at)}</td></tr>`)).join('')}</tbody></table></div></section>`:'';
+  const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수'];
+  const cell=a=>!a?'<td class="mx-n">·</td>':a.kind==='high'?'<td class="mx-h">신고가</td>':`<td class="mx-p">${a.pct}%</td>`;
+  const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
+   <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
+   <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">기준</th></tr></thead>
+   <tbody>${al.map(r=>{const by=Object.fromEntries(r.alerts.map(a=>[a.metric,a]));const at=r.alerts.map(a=>a.at.slice(0,7)).sort().pop();
+     return `<tr class="kwbtn" data-id="${r.id}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m])).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
   return abox+`<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
      <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
    ${f?'':`<div class="kcats">${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
