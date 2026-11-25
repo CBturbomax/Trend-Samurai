@@ -35,6 +35,7 @@ AUTO_ADD_MIN_HITS = 3                                          # 추천 서브�
 AUTO_ADD_MAX = 12                                              # 키워드당 자동으로 추가하는 서브레딧 수 한도
 
 YT_WEB_START = "2023-12"                                       # 키 없는 유튜브 수집 시작 달(속도 위해 범위 축소)
+MENTION_MULTIYEAR = False                                      # 여러 해를 한 번에 묻기(아카이브 시간 초과가 잦아 끔, 해 단위로)
 MENTION_POST_START = "2023-01"                                 # 레딧 글 언급 기본 수집 시작 달
 COMMENT_MONTHS = 24                                            # 레딧 댓글 언급은 최근 이만큼의 달만
 

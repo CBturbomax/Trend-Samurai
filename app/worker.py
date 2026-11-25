@@ -138,6 +138,10 @@ def enqueue_keyword(kid, refresh=False):
             if t.startswith(CPFX):   # 댓글: 최근 구간의 빈 달이 이어져 있으면 전체를 한 번에
                 am = all_months()
                 run = [m for m in am if m >= comment_from and month_bounds(m)[0] not in have]
+                if len(run) > 12 and not C.MENTION_MULTIYEAR:   # 긴 창은 시간 초과가 잦음(실측) → 최근 12개월부터, 나머지는 다음 차례
+                    _add(kid, "mention", 4, sub=s["name"], term=t, month=run[-1],
+                         start=month_bounds(run[-12])[0], end=month_bounds(run[-1])[1])
+                    run = run[:-12]
                 if len(run) > 1 and am.index(run[-1]) - am.index(run[0]) == len(run) - 1:
                     _add(kid, "mention", 4, sub=s["name"], term=t, month=run[-1],
                          start=month_bounds(run[0])[0], end=month_bounds(run[-1])[1])
@@ -145,7 +149,7 @@ def enqueue_keyword(kid, refresh=False):
             # 글: 통째로 빈 해들이 이어져 있으면 한 번에 묻고(100건씩 이어 받아 달별로 나눔) — 키워드·커뮤니티당 요청 1~몇 번
             full_years = [y for y in sorted(years) if not t.startswith(CPFX) and len(years[y]) > 1
                           and all(month_bounds(m)[0] not in have for m in years[y])]
-            if len(full_years) > 1 and [int(y) for y in full_years] == list(range(int(full_years[0]), int(full_years[-1]) + 1)):
+            if C.MENTION_MULTIYEAR and len(full_years) > 1 and [int(y) for y in full_years] == list(range(int(full_years[0]), int(full_years[-1]) + 1)):
                 _add(kid, "mention", 2, sub=s["name"], term=t, month=f"{full_years[-1]}-12",
                      start=f"{full_years[0]}-01-01", end=f"{int(full_years[-1]) + 1}-01-01")
                 years = {y: v for y, v in years.items() if y not in full_years}

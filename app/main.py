@@ -52,7 +52,9 @@ async def lifespan(app):
     # 레딧 댓글: 달마다 따로 묻던 대기 작업을 지우고, 빈 달 구간을 한 번에 묻는 작업으로 다시 넣음(요청 수 대폭 감소)
     x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold') "
       "AND julianday(end)-julianday(start)<=31")
-    x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status='queued' AND tries=0")   # 해마다 나뉜 댓글 대기분도 합쳐서 다시
+    x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status='queued' AND tries=0")
+    if not C.MENTION_MULTIYEAR:   # 여러 해짜리 대기분은 지우고 해 단위로 다시
+        x("DELETE FROM jobs WHERE kind='mention' AND status IN ('queued','hold') AND julianday(end)-julianday(start)>400")   # 해마다 나뉜 댓글 대기분도 합쳐서 다시
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
     worker.start()
