@@ -343,16 +343,16 @@ function viewYoutube(d){
 function viewOwn(d){
   if(!Object.keys(d.own).length)return '';
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:FOOT_R};
-  return chart('own-c',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'댓글 수',desc:'단위: '+UN().u+'. 메인 지표. 서브레딧이 생기기 전 달은 표시하지 않음.'+UN().n,series:ownAll(d,1)})
-       + chart('own-p',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'글 수',desc:'단위: '+UN().u+'. 보조 지표(지워진 글·재업로드로 출렁일 수 있음).'+UN().n,series:ownAll(d,0)});
+  return chart('own-p',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'글 수',desc:'단위: '+UN().u+'. 서브레딧이 생기기 전 달은 표시하지 않음.'+UN().n,series:ownAll(d,0)})
+       + chart('own-c',{...o,title:'레딧 · 전용 서브레딧 '+UN().t+'댓글 수',desc:'단위: '+UN().u+'.'+UN().n,series:ownAll(d,1)});
 }
 function mentionCharts(d,o){
   o=o||{months:d.months,cur:d.cur_month,source:'arctic-shift',foot:'자체 계산, 공식 수치 아님.'};
   const n=Object.keys(d.mentions).length;if(!n)return '';
   const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 · 키워드 언급 ${what} 수: 수집 중입니다. 최근 달부터 채워집니다.</div>`;
     return chart(id,{...o,title:`레딧 · 키워드 언급 ${what} 수 (커뮤니티 ${n}곳 합계)`,desc,series:totalOf('합계',mentionParts(d,key))})};
-  return one('men-c','mentions_c','댓글','단위: 개/월. 최근 2년만 수집. 이 키워드가 자주 나오는 레딧 커뮤니티들에서 댓글 본문에 키워드가 든 댓글 수를 합친 값.')
-    +one('men-s','mentions','글','단위: 개/월. 같은 커뮤니티에서 제목에 키워드가 든 글 수.');
+  return one('men-s','mentions','글','단위: 개/월. 같은 커뮤니티에서 제목에 키워드가 든 글 수.')
+    +one('men-c','mentions_c','댓글','단위: 개/월. 최근 2년만 수집. 이 키워드가 자주 나오는 레딧 커뮤니티들에서 댓글 본문에 키워드가 든 댓글 수를 합친 값.');
 }
 function redditManage(d){
   const cands=d.candidates.length?`<div class="box"><b>자동 추적에서 빠진 후보</b> <span class="dim small">(언급이 적었던 곳. 필요하면 체크해 추가)</span><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 6개월 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
@@ -367,9 +367,11 @@ function redditTotal(d){
   const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용·전체)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
   const mk=(id,i,key,what)=>{const l=[...own(i),...mentionParts(d,key).map(x=>({...x,name:x.name+' (언급)'}))];if(l.length<2)return '';
     return chart(id,{...o,title:`레딧 합산 · 키워드 관련 ${what} 수`,desc:`단위: 개/월. 전용 커뮤니티의 전체 ${what} + 다른 커뮤니티에서 키워드가 언급된 ${what}를 모두 더한 값. 아래 범례를 눌러 합계에 넣을 곳·뺄 곳을 고를 수 있음.`,series:totalOf('레딧 합계',l)})};
-  return mk('rt-c',1,'mentions_c','댓글')+mk('rt-p',0,'mentions','글');
+  return mk('rt-p',0,'mentions','글')+mk('rt-c',1,'mentions_c','댓글');
 }
-function viewReddit(d){return (d.global&&d.global.enabled?viewGlobal(d):'')+redditTotal(d)+mentionCharts(d)+viewOwn(d)+redditManage(d)}
+function viewReddit(d){   // 전용 커뮤니티가 있으면 '합산' 하나로(범례에서 전용·언급을 골라 볼 수 있음), 없으면 언급 합계만
+  const own=Object.keys(d.own).length,ment=Object.keys(d.mentions||{}).length;
+  return (d.global&&d.global.enabled?viewGlobal(d):'')+(own&&ment?redditTotal(d):own?viewOwn(d):mentionCharts(d))+redditManage(d)}
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
   const tags=d.tiktok||[],hist=d.tiktok_history||[];
