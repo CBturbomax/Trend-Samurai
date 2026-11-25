@@ -240,6 +240,16 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .mx tbody tr:nth-child(even) td{background-color:rgba(255,255,255,.015)}
 .mx tbody tr:nth-child(even) td.mx-h{background:rgba(46,160,67,.22)}.mx tbody tr:nth-child(even) td.mx-p{background:rgba(210,153,34,.13)}
 @media(max-width:640px){.mx th.mh span{display:none}.mx th.mh .ico{margin:0}}
+.kcell{position:relative;padding:12px 14px 14px;align-items:center}
+.kc-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.kc-n{font-size:16px;font-weight:800;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kc-s{font-size:11.5px;font-weight:600;color:#7d8996;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kc-sc{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;min-width:30px;text-align:right}
+.kc-sc.t1{color:#56d364}.kc-sc.t2{color:#e3b341}.kc-sc.t3{color:#c9d1d9}.kc-sc.t4{color:#6b7783}
+.kc-bar{position:absolute;left:0;bottom:0;height:3px}
+.kc-bar.t1{background:#2ea043}.kc-bar.t2{background:#d29922}.kc-bar.t3{background:#6e7681}.kc-bar.t4{background:#3a4550}
+.kcell small{display:none}
+@media(max-width:640px){.kc-n{font-size:15px}.kc-s{font-size:10.5px}.kc-sc{font-size:17px}.kcell{padding:10px 10px 12px;gap:8px}}
 </style>
 </head>
 <body>
@@ -615,7 +625,8 @@ function savedHtml(){
   return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
    ${f?'':`<div class="kcats"><button class="kcat ${S.cat==='전체'?'on':''}" data-cat="전체">전체<span>${all.length}</span></button>${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
-     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><small>${k.score}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
+     const m=k.m||{},tier=k.score>=80?'t1':k.score>=60?'t2':k.score>=40?'t3':'t4';
+     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''}><em>${i+1}</em><div class="kc-m"><span class="kc-n">${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><span class="kc-s">조회 ${fmtS(m.yt_views)} · 영상 ${fmtS(m.yt_videos)} · 레딧 ${fmtS(m.reddit_posts)}</span></div><b class="kc-sc ${tier}">${k.score}</b><i class="kc-bar ${tier}" style="width:${k.score}%"></i></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadAlerts(){try{S.alerts=await api('/api/alerts');S.alertIds={};S.alerts.forEach(r=>{if(r.highs)S.alertIds[r.id]=1});renderSaved()}catch(e){}}
