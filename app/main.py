@@ -227,7 +227,12 @@ def refresh(kid: int):
 
 @app.get("/api/keywords")
 def keywords():
-    return [dict(r) for r in q("SELECT id,name,category,country FROM keywords ORDER BY name")]
+    # 중요도 순: 최근 12개월에 올라온 유튜브 영상의 조회수 합(키워드끼리 바로 비교되는 절대값)
+    since = (worker.today().replace(day=1) - __import__("datetime").timedelta(days=365)).isoformat()
+    score = {r["keyword_id"]: r["v"] for r in q(
+        "SELECT keyword_id, SUM(views) v FROM yt_videos WHERE published>=? GROUP BY keyword_id", (since,))}
+    rows = [dict(r) | {"score": score.get(r["id"], 0) or 0} for r in q("SELECT id,name,category,country FROM keywords")]
+    return sorted(rows, key=lambda r: (-r["score"], r["name"]))
 
 
 class GroupIn(BaseModel):

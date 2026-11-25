@@ -465,7 +465,7 @@ function render(){
     const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
     $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
       <div class="filters">${tg2(TABS.filter(t=>t[0]!=='year'),'tab',S.tab,'tab')}</div>
-      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}<button class="btn" id="btnSelClear">비교 끝내기</button></div></section>`+viewCompare();
+      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
     return}
   $('#kpis').innerHTML=kpis(d);
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
@@ -513,17 +513,18 @@ function savedHtml(){
   const groups={};ks.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
   const names=[...order.filter(g=>groups[g]),...Object.keys(groups).filter(g=>!order.includes(g))];
   const tg=`<div class="toggle-group">${[['category','카테고리별'],['country','국가별']].map(([k,n])=>`<button class="toggle grpby ${S.groupBy===k?'on':''}" data-g="${k}">${n}</button>`).join('')}</div>`;
-  return `<div class="filters">${tg}<label class="search-box" style="flex:0 1 220px;min-width:160px"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length>1?`<button class="btn" id="btnSelClear">비교 끝내기</button>`:''}</div>
+  return `<div class="filters">${tg}<label class="search-box" style="flex:0 1 220px;min-width:160px"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
    <div class="kgroups">${names.map(g=>`<div class="kgroup"><div class="kg-title">${esc(g)}</div><div class="kg-items">${groups[g].map(k=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';return `<button class="kchip kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''}>${esc(k.name)}</button>`}).join('')}</div></div>`).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadSaved(){
   S.ks=await api('/api/keywords');renderSaved();
-  if(!S.kid&&S.ks.length){S.sel=[];await select(S.ks[0].id);S.autoSel=true}
+  if(!S.kid&&!S.started&&S.ks.length){S.started=true;S.sel=[];await select(S.ks[0].id);S.autoSel=true}
 }
 async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
   if(S.autoSel){S.autoSel=false;S.sel=[]}   // 처음 자동으로 열린 키워드는 첫 클릭 때 바꿔 끼움
-  if(S.sel.includes(id)){if(S.sel.length===1)return;S.sel=S.sel.filter(x=>x!==id)}else S.sel.push(id);
+  if(S.sel.includes(id))S.sel=S.sel.filter(x=>x!==id);else S.sel.push(id);
+  if(!S.sel.length){S.kid=null;S.data=null;$('#progress').style.display='none';render();renderSaved();return}
   S.kid=S.sel[S.sel.length-1];lastDone=-1;
   for(const i of S.sel)if(!S.cmpData[i])S.cmpData[i]=await api('/api/keywords/'+i+'/data');
   S.data=S.cmpData[S.kid];await loadData();renderSaved()}
