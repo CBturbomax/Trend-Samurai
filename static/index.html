@@ -126,6 +126,39 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .kchip{padding:4px 10px;background:transparent;border:1px solid var(--line);font-weight:600;font-size:13px;color:var(--text);cursor:pointer}
 .kchip.on{background:rgba(255,255,255,.06);border-width:2px;font-weight:800}
 @media (max-width:600px){.kgroup{flex-direction:column;gap:4px}.kg-title{flex:none}}
+
+/* ── 컨트롤: 세그먼트 버튼 ── */
+.filters{align-items:center;gap:10px}
+.toggle-group{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;background:#0d1217;border:1px solid var(--line);border-radius:10px}
+.toggle{padding:7px 14px;border:0;border-radius:7px;background:transparent;color:#a9b4bf;font-size:14px;font-weight:600;line-height:1.2;transition:background .15s,color .15s}
+.toggle:hover{color:#fff;background:rgba(255,255,255,.05)}
+.toggle.on,.toggle[aria-pressed="true"]{background:var(--yellow);color:#10161c}
+.btn{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;background:transparent;border:1px solid var(--line);color:#c9d1d9;transition:border-color .15s,background .15s}
+.btn:hover{border-color:#5b6672;background:rgba(255,255,255,.04)}
+.btn.main{background:var(--yellow);border-color:var(--yellow);color:#10161c}
+.btn.warn{color:#ff7b72}.btn.warn:hover{border-color:#ff7b72}
+.actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.search-box input,#kw{border-radius:8px}
+/* ── 차트 패널 ── */
+.chart-panel{border-top:2px solid var(--acc,var(--line));padding-top:18px}
+.chart-panel .panel-head{align-items:baseline}
+.chart-panel .panel-head .unit{font-size:12px;color:#7d8996;margin-left:auto}
+.chart-panel h2{font-size:18px}
+.chd{display:flex;align-items:baseline;gap:10px;margin:2px 0 10px}
+.chd-v{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.chd-m{font-size:12px;color:#7d8996}
+.chd-c{font-size:13px;font-weight:700}.chd-c.up{color:#3fb950}.chd-c.down{color:#f85149}.chd-c small{font-weight:500;color:#7d8996}
+.chart-box{border-radius:10px;padding:10px 6px 4px;background:#11171d}
+.legend{gap:6px;margin-bottom:10px}
+.lg{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;font-weight:600;background:transparent;cursor:pointer}
+.lg i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.lg.off{opacity:.4}.lg.off i{background:transparent!important;border:1px solid #7d8996}
+.lg-cap{font-size:12px;color:#7d8996;align-self:center;margin-right:2px}
+.tip{border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.45);padding:8px 10px;min-width:150px;font-size:12px;background:#1b232c;border-color:#2e3a46}
+.tip-h{font-weight:700;color:#c5cdd6;margin-bottom:4px}
+.tip-r{display:flex;align-items:center;gap:6px;line-height:1.7}.tip-r i{width:8px;height:8px;border-radius:50%}.tip-r span{flex:1;color:#a9b4bf}.tip-r b{font-variant-numeric:tabular-nums}
+.foot{font-size:11px;color:#6b7783}
+@media(max-width:640px){.toggle{padding:6px 11px;font-size:13px}.btn{padding:6px 11px;font-size:12px}.actions{margin-left:0}.chd-v{font-size:24px}.chart-box{padding:6px 2px 2px}}
 </style>
 </head>
 <body>
@@ -180,89 +213,70 @@ function chart(id,o){
   const pl=PLAT[S.tab];
   if(pl)o.series.forEach(x=>{if(x.bold||x.isTotal||o.series.length===1)x.color=pl.c});
   const hid=S.hidden[id]||(S.hidden[id]=new Set(o.defaultHidden||[]));
-  // 합산 차트: part 표시된 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
+  // 합산 차트: part 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
   const parts=o.series.filter(s=>s.part),inc=parts.filter(s=>!hid.has(s.name));
   o.series.forEach(s=>{if(s.isTotal){const pts={};o.months.forEach(m=>{const v=inc.map(p=>p.pts[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});s.pts=pts}});
-  const months=o.daily?o.months:visMonths(o.months), series=o.series.filter(s=>!s.part&&!hid.has(s.name));
-  REG[id]={months,series};
+  const series=o.series.filter(s=>!s.part&&!hid.has(s.name));
+  let months=o.daily?o.months:visMonths(o.months);
+  const f0=months.findIndex(m=>series.some(s=>s.pts[m]!=null&&s.pts[m]>0));   // 데이터가 시작되기 전 빈 기간은 잘라냄
+  if(f0>0)months=months.slice(f0);
+  REG[id]={months,series,o};
   const chip=s=>`<button class="lg ${hid.has(s.name)?'off':''}" data-chart="${id}" data-s="${esc(s.name)}"><i style="background:${s.color}"></i>${esc(s.name)}</button>`;
-  const lg=parts.length?`<div class="legend"><span class="dim small" style="align-self:center">합계에 포함 (${inc.length}/${parts.length}) · 눌러서 빼기/넣기:</span>${parts.map(chip).join('')}</div>`
+  const lg=parts.length?`<div class="legend"><span class="lg-cap">합계 포함 ${inc.length}/${parts.length}</span>${parts.map(chip).join('')}</div>`
     :o.series.length>1?`<div class="legend">${o.series.map(chip).join('')}</div>`:'';
   const empty=!series.some(s=>months.some(m=>s.pts[m]!=null));
-  return `<section class="panel"${pl?` style="border-top:3px solid ${pl.c}"`:''}><div class="panel-head"><h2>${pl?pl.i:''}${esc(o.title)}</h2></div><p class="desc">${o.desc}</p>${lg}
-   ${empty?'<div class="box dim">수집 중</div>':
-   `<div class="chart-box"><div class="pc pcwrap">${pcSvg(id,months,series,o)}<div class="tip"></div></div><div class="mo">${moSvg(months,series,o)}</div></div>`}
-   <div class="foot"><span>${o.foot||''}</span><span class="src">출처: ${esc(o.source)}</span></div></section>`;
+  // 머리말 숫자: 대표 선(합계 또는 하나뿐인 선)의 최근 완료 기간 값과 1년 전 대비
+  const main=series.find(s=>s.isTotal||s.bold)||(series.length===1?series[0]:null);
+  let head='';
+  if(main&&!empty){const done=months.filter(m=>m!==o.cur&&main.pts[m]!=null),lm=done[done.length-1];
+    if(lm){const v=main.pts[lm],back=o.daily?52:12,pm=done[done.length-1-back],pv=pm!=null?main.pts[pm]:null,ch=pv>0?(v-pv)/pv*100:null;
+      head=`<div class="chd"><span class="chd-v">${fmtS(v)}</span><span class="chd-m">${lm}</span>${ch==null?'':`<span class="chd-c ${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(Math.abs(ch)<10?1:0)}% <small>YoY</small></span>`}</div>`}}
+  return `<section class="panel chart-panel"${pl?` style="--acc:${pl.c}"`:''}><div class="panel-head"><h2>${pl?pl.i:''}${esc(o.title)}</h2><span class="unit">${o.desc||''}</span></div>${head}${lg}
+   ${empty?'<div class="box dim">수집 중</div>':`<div class="chart-box pcwrap">${lineSvg(id,months,series,o)}<div class="tip"></div></div>`}
+   <div class="foot"><span>${o.foot||''}</span><span class="src">${esc(o.source)}</span></div></section>`;
 }
 function maxOf(series,months){let mx=0;series.forEach(s=>months.forEach(m=>{const v=s.pts[m];if(v!=null&&v>mx)mx=v}));return mx}
-const PC={W:1100,H:440,L:66,R:44,T:30,B:44};
-function pcSvg(id,months,series,o){
-  const {W,H,L,R,T,B}=PC,pw=W-L-R,ph=H-T-B,n=months.length;
+const SZ=()=>innerWidth<640?{W:420,H:250,L:40,R:46,T:14,B:26,f:11}:{W:1100,H:400,L:56,R:70,T:18,B:34,f:13};
+function lineSvg(id,months,series,o){
+  const Z=SZ(),{W,H,L,R,T,B,f}=Z,pw=W-L-R,ph=H-T-B,n=months.length;
   const X=i=>L+(n>1?i/(n-1):.5)*pw,[ym,step]=nice(maxOf(series,months)),Yv=v=>T+ph-v/ym*ph;
-  const ci=months.indexOf(o.cur), li=ci>0?ci-1:(ci<0?n-1:-1);
-  let g='';
-  for(let v=0;v<=ym+1e-9;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${Yv(v)}" y2="${Yv(v)}" stroke="#2a3540"/><text x="${L-10}" y="${Yv(v)+5}" text-anchor="end" fill="#9aa7b3" font-size="15">${tick(v)}</text>`;
-  months.forEach((m,i)=>{if(o.daily){const long=n>40,pm=i?months[i-1].slice(0,7):'',q=m.slice(0,7)!==pm&&['01','04','07','10'].includes(m.slice(5,7));if(long?q:(n<=16||i===0||i===n-1||i%7===0)){const jan=long&&m.slice(5,7)==='01';g+=`<text x="${X(i)}" y="${H-B+24}" text-anchor="middle" fill="${jan?'#fff':'#9aa7b3'}" font-size="15">${long?(jan?m.slice(0,4):m.slice(5,7)+'월'):m.slice(5)}</text>`+(jan?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#2a3540" stroke-dasharray="2 4"/>`:'')}return}const jan=m.endsWith('-01');if(n<=13||jan||(n<=37&&m.endsWith('-07')))g+=`<text x="${X(i)}" y="${H-B+24}" text-anchor="middle" fill="${jan?'#fff':'#9aa7b3'}" font-size="15">${n<=13?m.slice(2):jan?m.slice(0,4):m.slice(5)+'월'}</text>`+(jan?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#2a3540" stroke-dasharray="2 4"/>`:'')});
-  series.forEach(s=>{
-    let d='',pen=false;
-    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Yv(v).toFixed(1);pen=true});
-    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.bold?3:2.2}" stroke-linejoin="round"/>`;
-    if(ci>0&&s.pts[o.cur]!=null&&s.pts[months[ci-1]]!=null)g+=`<line x1="${X(ci-1)}" y1="${Yv(s.pts[months[ci-1]])}" x2="${X(ci)}" y2="${Yv(s.pts[o.cur])}" stroke="${s.color}" stroke-width="2.2" stroke-dasharray="6 5"/>`;
-    months.forEach((m,i)=>{const v=s.pts[m];if(v==null)return;
-      if(i===li)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="6" fill="${s.color}" stroke="#fff" stroke-width="2"/>`;
-      else if(i===ci)g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="3.5" fill="#0f1419" stroke="${s.color}" stroke-width="2"/>`;
-      else g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="${n<=40?3.2:2.4}" fill="${s.color}" stroke="#151b22" stroke-width="1"/>`});
-  });
-  /* 값 라벨: 기본은 최신 12개월 + 각 연말. 겹치면 위→아래→더 위 순으로 피하고, 자리가 없으면 생략 */
-  const boxes=[],hit=(a,b)=>a[0]<b[0]+b[2]&&b[0]<a[0]+a[2]&&a[1]<b[1]+b[3]&&b[1]<a[1]+a[3];
-  const order=[li,...months.map((_,i)=>n-1-i).filter(i=>i!==li)].filter(i=>i>=0);
-  order.forEach(i=>{const m=months[i];if(!(S.allLabels||(series.length<3&&i>=n-12)||(!o.daily&&m.endsWith('-12'))||i===li))return;
-    series.forEach(s=>{const v=s.pts[m];if(v==null)return;const t=fmt(v),w=t.length*8.4+6,x=Math.min(Math.max(X(i),L+w/2),W-w/2-2),y=Yv(v);
-      for(const dy of [-11,22,-27,38]){const b=[x-w/2,y+dy-14,w,17];if(b[1]<2||b[1]+17>T+ph+2||boxes.some(o2=>hit(b,o2)))continue;boxes.push(b);
-        g+=`<text x="${x}" y="${y+dy}" text-anchor="middle" fill="${s.color}" font-size="${i===li?15:14}" font-weight="${i===li?800:500}" paint-order="stroke" stroke="#151b22" stroke-width="4">${t}</text>`;break}})});
-  if(ci>=0)g+=`<text x="${W-R}" y="${T-12}" text-anchor="end" fill="#9aa7b3" font-size="14">┄ ${o.cur} 진행 중</text>`;
-  g+=`<line class="guide" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".35" style="display:none"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" data-id="${id}" role="img">${g}</svg>`;
+  const ci=months.indexOf(o.cur);
+  let g=`<defs>${series.map((s,k)=>`<linearGradient id="gr-${id}-${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.color}" stop-opacity=".22"/><stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient>`).join('')}</defs>`;
+  for(let v=0;v<=ym+1e-9;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${Yv(v)}" y2="${Yv(v)}" stroke="#ffffff" stroke-opacity="${v?.06:.18}"/><text x="${L-8}" y="${Yv(v)+f*.35}" text-anchor="end" fill="#7d8996" font-size="${f}">${fmtS(v)}</text>`;
+  // x축: 해가 바뀌는 곳에 연도, 짧은 기간이면 분기/월
+  const yrs=new Set(months.map(m=>m.slice(0,4))).size;
+  months.forEach((m,i)=>{const mm=m.slice(5,7),first=i===0||m.slice(0,4)!==months[i-1].slice(0,4);let t='';
+    if(o.daily){if(first)t=m.slice(0,4);else if(yrs<=2&&m.slice(5,7)!==months[i-1].slice(5,7)&&['04','07','10'].includes(mm))t=+mm+'월'}
+    else if(yrs>2){if(first)t=m.slice(0,4)}else if(first)t=m.slice(0,4);else if(['04','07','10'].includes(mm))t=+mm+'월';
+    if(t)g+=`<text x="${X(i)}" y="${H-B+f+8}" text-anchor="middle" fill="${first?'#c5cdd6':'#7d8996'}" font-size="${f}">${t}</text>`+(first&&i?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".06"/>`:'')});
+  const ends=[];
+  series.forEach((s,k)=>{let d='',pen=false,first=null,last=null;
+    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Yv(v).toFixed(1);pen=true;if(first==null)first=i;last=i});
+    if(!d)return;
+    if(series.length===1&&first!=null)g+=`<path d="${d}L${X(last).toFixed(1)} ${T+ph}L${X(first).toFixed(1)} ${T+ph}Z" fill="url(#gr-${id}-${k})"/>`;
+    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.bold||s.isTotal||series.length===1?2.4:1.8}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(ci>0&&s.pts[o.cur]!=null&&s.pts[months[ci-1]]!=null)g+=`<line x1="${X(ci-1)}" y1="${Yv(s.pts[months[ci-1]])}" x2="${X(ci)}" y2="${Yv(s.pts[o.cur])}" stroke="${s.color}" stroke-width="1.6" stroke-dasharray="3 4" stroke-opacity=".7"/>`;
+    if(last!=null){g+=`<circle cx="${X(last)}" cy="${Yv(s.pts[months[last]])}" r="3.5" fill="${s.color}" stroke="#151b22" stroke-width="2"/>`;ends.push({y:Yv(s.pts[months[last]]),x:X(last),t:fmtS(s.pts[months[last]]),c:s.color})}});
+  // 선 끝 값(겹치면 위아래로 밀어냄)
+  ends.sort((a,b)=>a.y-b.y);for(let i=1;i<ends.length;i++)if(ends[i].y-ends[i-1].y<f+3)ends[i].y=ends[i-1].y+f+3;
+  ends.forEach(e=>g+=`<text x="${e.x+7}" y="${e.y+f*.35}" fill="#e8edf2" font-size="${f}" font-weight="700">${e.t}</text>`);
+  g+=`<line class="guide" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".3" style="display:none"/><g class="hov"></g>`;
+  return `<svg viewBox="0 0 ${W} ${H}" data-id="${id}" role="img" aria-label="${esc(o.title)}">${g}</svg>`;
 }
-/* 폰 전용: 세로로 긴 차트. 최신 달이 맨 위, 아래로 갈수록 과거. 값은 오른쪽 열에 표로 */
-function moSvg(months,series,o){
-  /* 폰 전용 세로 차트: 위가 과거, 맨 아래가 최신 달. 모든 지점에 점을 찍고,
-     선이 1~2개면 점 옆에 값을, 3개 이상이면 오른쪽 열에 값을 표로 적는다. */
-  const f0=months.findIndex(m=>series.some(s=>s.pts[m]!=null));const ms=months.slice(Math.max(0,f0-1));
-  const k=series.length,table=k>=3,rh=table?20:24,top=34,W=360,L=50,cw=table?Math.max(27,Math.min(46,Math.floor(160/k))):0,tw=cw*k;
-  const x0=L+4,pw=W-L-tw-(table?18:14),[ym]=nice(maxOf(series,ms)),Xv=v=>x0+v/ym*pw,Yi=i=>top+i*rh+rh/2,H=top+ms.length*rh+8;
-  const ci=ms.indexOf(o.cur),li=ci>=0?ci-1:ms.length-1;
-  let g=`<text x="${x0}" y="14" fill="#9aa7b3" font-size="11">0</text><text x="${x0+pw}" y="14" text-anchor="end" fill="#9aa7b3" font-size="11">${tick(ym)}</text>
-   <text x="${x0+pw/2}" y="14" text-anchor="middle" fill="#9aa7b3" font-size="11">${tick(ym/2)}</text>
-   <line x1="${x0}" x2="${x0}" y1="${top}" y2="${H-8}" stroke="#2a3540"/><line x1="${x0+pw/2}" x2="${x0+pw/2}" y1="${top}" y2="${H-8}" stroke="#2a3540" stroke-dasharray="2 4"/><line x1="${x0+pw}" x2="${x0+pw}" y1="${top}" y2="${H-8}" stroke="#2a3540" stroke-dasharray="2 4"/>`;
-  if(table)series.forEach((s,j)=>g+=`<rect x="${W-tw+j*cw+cw/2-5}" y="16" width="10" height="10" fill="${s.color}"/>`);
-  ms.forEach((m,i)=>{const jan=m.endsWith('-01');
-    if(i===li)g+=`<rect x="0" y="${top+i*rh}" width="${W}" height="${rh}" fill="#1b232b"/>`;
-    if(jan&&i>0)g+=`<line x1="0" x2="${W}" y1="${top+i*rh}" y2="${top+i*rh}" stroke="#2a3540"/>`;
-    g+=`<text x="2" y="${Yi(i)+4}" fill="${i===li||jan||i===ci?'#fff':'#9aa7b3'}" font-size="12" font-weight="${i===li||jan?700:400}">${o.daily?m.slice(5):m.slice(2)}${i===ci?'*':''}</text>`;
-    if(table)series.forEach((s,j)=>{const v=s.pts[m];if(v!=null)g+=`<text x="${W-tw+(j+1)*cw-2}" y="${Yi(i)+4}" text-anchor="end" fill="${s.color}" font-size="${k>4?9.5:11}" font-weight="${i===li?700:400}">${fmtS(v)}</text>`})});
-  series.forEach(s=>{let d='',pen=false;
-    ms.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+Xv(v).toFixed(1)+' '+Yi(i);pen=true});
-    g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
-    if(ci>0&&s.pts[o.cur]!=null&&s.pts[ms[ci-1]]!=null)g+=`<line x1="${Xv(s.pts[ms[ci-1]])}" y1="${Yi(ci-1)}" x2="${Xv(s.pts[o.cur])}" y2="${Yi(ci)}" stroke="${s.color}" stroke-width="2" stroke-dasharray="4 3"/>`});
-  /* 점 + 값 */
-  ms.forEach((m,i)=>{const row=series.map(s=>({s,v:s.pts[m]})).filter(r=>r.v!=null).sort((a,b)=>a.v-b.v);
-    row.forEach((r,j)=>{const x=Xv(r.v),y=Yi(i),c=r.s.color;
-      g+=i===li?`<circle cx="${x}" cy="${y}" r="5" fill="${c}" stroke="#fff" stroke-width="1.5"/>`:i===ci?`<circle cx="${x}" cy="${y}" r="3.5" fill="#0f1419" stroke="${c}" stroke-width="2"/>`:`<circle cx="${x}" cy="${y}" r="3" fill="${c}" stroke="#151b22" stroke-width="1"/>`;
-      if(table)return;
-      const t=fmtS(r.v),w=t.length*7+4;let left=row.length===2?j===0:x+9+w>W-2;   // 두 선이면 작은 값은 왼쪽, 큰 값은 오른쪽에
-      if(left&&x-9-w<x0)left=false;if(!left&&x+9+w>W-2)left=true;
-      g+=`<text x="${left?x-9:x+9}" y="${y+4}" text-anchor="${left?'end':'start'}" fill="${c}" font-size="12" font-weight="${i===li?800:500}" paint-order="stroke" stroke="${i===li?'#1b232b':'#151b22'}" stroke-width="3">${t}</text>`})});
-  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg><div class="small dim">위 = 과거, 아래 = 최신 · * 진행 중인 달${table?' · 오른쪽 숫자는 범례 색 순서':''}</div>`;
-}
-document.addEventListener('mousemove',e=>{const svg=e.target.closest&&e.target.closest('.pcwrap svg');if(!svg)return;
-  const r=REG[svg.dataset.id],b=svg.getBoundingClientRect(),{W,L,R}=PC,n=r.months.length;
-  const i=Math.max(0,Math.min(n-1,Math.round(((e.clientX-b.left)/b.width*W-L)/(W-L-R)*(n-1)))),x=L+(n>1?i/(n-1):.5)*(W-L-R);
+function hover(e){const svg=e.target.closest&&e.target.closest('.pcwrap svg');if(!svg)return;
+  const r=REG[svg.dataset.id];if(!r)return;const Z=SZ(),{W,L,R,T,H,B}=Z,pw=W-L-R,ph=H-T-B,b=svg.getBoundingClientRect(),n=r.months.length;
+  const cx=(e.touches?e.touches[0].clientX:e.clientX);
+  const i=Math.max(0,Math.min(n-1,Math.round(((cx-b.left)/b.width*W-L)/pw*(n-1)))),x=L+(n>1?i/(n-1):.5)*pw,m=r.months[i];
+  const [ym]=nice(maxOf(r.series,r.months)),Yv=v=>T+ph-v/ym*ph;
   const gl=svg.querySelector('.guide');gl.setAttribute('x1',x);gl.setAttribute('x2',x);gl.style.display='';
-  const tip=svg.parentNode.querySelector('.tip'),m=r.months[i];
-  tip.innerHTML=`<b>${m}</b><br>`+r.series.map(s=>`<span style="color:${s.color}">■</span> ${esc(s.name)}: ${fmt(s.pts[m])}`).join('<br>');
-  tip.style.display='block';const px=x/W*b.width;tip.style.left=(px>b.width/2?px-tip.offsetWidth-12:px+12)+'px'});
-document.addEventListener('mouseout',e=>{const svg=e.target.closest&&e.target.closest('.pcwrap svg');if(svg&&!svg.contains(e.relatedTarget)){svg.querySelector('.guide').style.display='none';svg.parentNode.querySelector('.tip').style.display='none'}});
+  svg.querySelector('.hov').innerHTML=r.series.filter(s=>s.pts[m]!=null).map(s=>`<circle cx="${x}" cy="${Yv(s.pts[m])}" r="4.5" fill="${s.color}" stroke="#fff" stroke-width="1.5"/>`).join('');
+  const tip=svg.parentNode.querySelector('.tip');
+  tip.innerHTML=`<div class="tip-h">${m}${m===r.o.cur?' · 진행 중':''}</div>`+r.series.filter(s=>s.pts[m]!=null).sort((a,b)=>b.pts[m]-a.pts[m]).map(s=>`<div class="tip-r"><i style="background:${s.color}"></i><span>${esc(s.name)}</span><b>${fmt(s.pts[m])}</b></div>`).join('');
+  tip.style.display='block';const px=x/W*b.width;tip.style.left=Math.max(0,px>b.width/2?px-tip.offsetWidth-14:px+14)+'px'}
+function unhover(svg){svg.querySelector('.guide').style.display='none';svg.querySelector('.hov').innerHTML='';svg.parentNode.querySelector('.tip').style.display='none'}
+document.addEventListener('mousemove',hover);document.addEventListener('touchmove',hover,{passive:true});document.addEventListener('touchstart',hover,{passive:true});
+document.addEventListener('mouseout',e=>{const svg=e.target.closest&&e.target.closest('.pcwrap svg');if(svg&&!svg.contains(e.relatedTarget))unhover(svg)});
+addEventListener('resize',()=>{clearTimeout(S.rz);S.rz=setTimeout(()=>render(),200)});
 
 /* ───── 지표 계산 ───── */
 function ownSeries(d,idx){ // idx 0=글, 1=댓글 → 하루 평균
@@ -451,7 +465,7 @@ function render(){
     const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
     $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
       <div class="filters">${tg2(TABS.filter(t=>t[0]!=='year'),'tab',S.tab,'tab')}</div>
-      <div class="filters">${tg2([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}<button class="btn" id="btnSelClear">비교 끝내기</button></div></section>`+viewCompare();
+      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}<button class="btn" id="btnSelClear">비교 끝내기</button></div></section>`+viewCompare();
     return}
   $('#kpis').innerHTML=kpis(d);
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
@@ -459,11 +473,9 @@ function render(){
    <span class="count">분류 <select class="gsel" id="gCat"><option value="">미분류</option>${CATS.map(c=>`<option ${d.category===c?'selected':''}>${c}</option>`).join('')}</select>
    <select class="gsel" id="gCtr"><option value="">미분류</option>${CTRS.map(c=>`<option ${d.country===c?'selected':''}>${c}</option>`).join('')}</select></span></div>
    <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
-   <div class="filters">${tg([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}
+   <div class="filters">${tg([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}
    ${['yt','google','year'].includes(S.tab)?tg([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}
-   ${tg([['total','월 합계'],['daily','하루 평균']],'unit',S.unit,'u')}
-   <button id="btnLabels" class="btn pc ${S.allLabels?'main':''}">모든 점 라벨</button>
-   <button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">HTML 리포트</button><button class="btn" id="btnRefresh">지금 갱신</button>${d.full?'<span class="small dim">과거(2019~) 데이터 받는 중</span>':'<button class="btn" id="btnFull" title="유튜브(2019~2021)·레딧 댓글 언급(2년보다 이전)까지 받기">과거(2019~)도 받기</button>'}<button class="btn warn" id="btnDel">삭제</button></div></section>`+VIEW[S.tab](d);
+   <div class="actions"><button class="btn" id="btnRefresh">갱신</button>${d.full?'':'<button class="btn" id="btnFull">과거 데이터 받기</button>'}<button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">리포트</button><button class="btn warn" id="btnDel">삭제</button></div></div></section>`+VIEW[S.tab](d);
 }
 
 /* ───── 진행 패널 ───── */
