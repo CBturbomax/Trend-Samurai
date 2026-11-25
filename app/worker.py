@@ -806,7 +806,7 @@ HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytsta
 
 
 PIN_GEOS = ("US", "GB", "DE", "FR", "IT", "ES")
-PIN_GAP = 15   # 요청 사이 간격(초) — 핀터레스트는 빨리 두드리면 429
+PIN_GAP = 8   # 요청 사이 간격(초) — 핀터레스트는 빨리 두드리면 429
 
 
 def do_pin(job):

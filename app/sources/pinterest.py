@@ -19,21 +19,29 @@ def _sundays():
         yield (d - dt.timedelta(weeks=i)).isoformat()
 
 
+_END = {}   # 하루 동안 자료가 나오는 마지막 일요일을 기억(모르는 검색어마다 4번씩 두드리지 않게)
+
+
+def _get(term, country, end):
+    try:
+        return requests.get(URL, params={"terms": term.lower(), "country": country, "end_date": end, "days": 730,
+                                         "aggregation": 2, "shouldMock": "false", "normalize_against_group": "true",
+                                         "predicted_days": 0}, headers=HEAD, timeout=30)
+    except requests.RequestException as e:
+        raise PinError(type(e).__name__)
+
+
 def fetch(term, country="US"):
-    """{주 시작일: 지수} — 값이 없으면 {}. 마지막 일요일 자료가 아직 안 나왔으면 한 주씩 앞당겨 재시도."""
-    last = None
-    for end in _sundays():
-        try:
-            r = requests.get(URL, params={"terms": term.lower(), "country": country, "end_date": end, "days": 730,
-                                          "aggregation": 2, "shouldMock": "false", "normalize_against_group": "true",
-                                          "predicted_days": 0}, headers=HEAD, timeout=30)
-        except requests.RequestException as e:
-            raise PinError(type(e).__name__)
+    """{주 시작일: 지수} — 핀터레스트에 없는 검색어면 {}."""
+    today = dt.date.today().isoformat()
+    ends = [_END[today]] if _END.get(today) else list(_sundays())
+    for end in ends:
+        r = _get(term, country, end)
         if r.status_code == 400:
-            last = 400
-            continue
+            continue   # 그 일요일 자료가 아직 없거나(날짜 모름) 검색어가 없음
         if r.status_code != 200:
             raise PinError(f"HTTP {r.status_code}")
+        _END[today] = end
         out = {}
         for t in r.json() or []:
             for c in t.get("counts") or []:
@@ -41,4 +49,4 @@ def fetch(term, country="US"):
                 if c.get("date") and v is not None:
                     out[c["date"][:10]] = float(v)
         return out
-    return {} if last == 400 else {}
+    return {}
