@@ -524,6 +524,71 @@ def build(kid: int):
     }
 
 
+_ALERT = {"t": 0.0, "v": None}
+
+
+def _highs(name, pts, cur, min_n=12):
+    """pts: {기간: 값}. 마지막 완료 기간 값이 이전 최고 이상이면 신고가, 최고의 90% 이상이면 근접."""
+    ks = sorted(k for k, v in pts.items() if v is not None and k != cur)
+    if len(ks) < min_n:
+        return None
+    last, v = ks[-1], pts[ks[-1]]
+    prev = max(pts[k] for k in ks[:-1])
+    top = max(prev, v)
+    if top <= 0 or v <= 0:
+        return None
+    if v >= prev:
+        return {"metric": name, "kind": "high", "at": last, "value": v, "pct": 100}
+    if v >= 0.9 * top:
+        return {"metric": name, "kind": "near", "at": last, "value": v, "pct": round(v / top * 100)}
+    return None
+
+
+def keyword_alerts(d):
+    cur = d["cur_month"]
+    out = []
+    for gp, label in (("web", "구글 검색"), ("youtube", "유튜브 검색")):
+        s = {}
+        for t in d["trends"]:
+            if t["gprop"] == gp and t["geo"] == "WW":
+                for m, (v, _p) in t["points"].items():
+                    s[m] = s.get(m, 0) + v
+        out.append(_highs(label, s, cur))
+    out.append(_highs("유튜브 영상 수", {m: v[0] for m, v in (d["youtube"].get("months") or {}).items()}, cur))
+    rp = {}
+    for ms in d["own"].values():
+        for m, v in ms.items():
+            rp[m] = rp.get(m, 0) + v[0]
+    for ms in d["mentions"].values():
+        for m, by in ms.items():
+            rp[m] = rp.get(m, 0) + sum(by.values())
+    out.append(_highs("레딧 글 수", rp, cur))
+    tt = {r["week"]: r["value"] for r in d["tiktok_history"]}
+    if (d.get("tiktok_src") or {}).get("unit") == "views":
+        out.append(_highs("틱톡 조회수", tt, None, 26))
+    return [a for a in out if a]
+
+
+@app.get("/api/alerts")
+def alerts():
+    """지표별 신고가(최근 완료 기간이 역대 최고 이상) 또는 근접(최고의 90% 이상) 키워드. 10분 캐시."""
+    if _ALERT["v"] is not None and time.time() - _ALERT["t"] < 600:
+        return _ALERT["v"]
+    res = []
+    for k in q("SELECT id FROM keywords"):
+        try:
+            d = build(k["id"])
+        except Exception:
+            continue
+        a = keyword_alerts(d)
+        if a:
+            res.append({"id": d["id"], "keyword": d["keyword"], "category": d["category"], "alerts": a,
+                        "highs": sum(x["kind"] == "high" for x in a)})
+    res.sort(key=lambda r: (-r["highs"], -len(r["alerts"]), r["keyword"]))
+    _ALERT.update(t=time.time(), v=res)
+    return res
+
+
 @app.get("/api/keywords/{kid}/data")
 def data(kid: int):
     return build(kid)

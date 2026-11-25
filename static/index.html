@@ -174,6 +174,15 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .kcell small{font-size:11px;color:#7d8996;font-variant-numeric:tabular-nums}
 .kcell.on{border-width:2px;padding:7px 9px;background:rgba(255,255,255,.04)}
 @media(max-width:640px){.kgrid{grid-template-columns:repeat(2,1fr)}.kcat{padding:8px 10px}}
+.alerts{border:1px solid var(--line);border-left:3px solid #3fb950;background:var(--panel-2);padding:10px 12px;margin-bottom:14px}
+.al-h{font-size:13px;margin-bottom:8px;color:#e8edf2}.al-h b{color:#3fb950;margin-right:4px}.al-h span{color:#8b96a2}
+.al-list{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.al-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:5px 6px;background:none;border:0;border-bottom:1px solid rgba(255,255,255,.05);text-align:left;cursor:pointer}
+.al-row:hover{background:rgba(255,255,255,.04)}
+.al-k{font-weight:800;font-size:13px;color:#fff;min-width:130px}
+.al-b{font-size:11px;font-weight:700;padding:2px 6px;border:1px solid}
+.al-b.high{color:#3fb950;border-color:#2f6f3a}.al-b.near{color:#d9b84a;border-color:#6b5a22}
+.kcell .hi{font-style:normal;color:#3fb950;font-size:10px;margin-left:5px}
 </style>
 </head>
 <body>
@@ -529,15 +538,19 @@ function savedHtml(){
   const seg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
   const list=f?all.filter(k=>k.name.includes(f)):groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
-  return `<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
+  const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
+  const abox=al.length?`<div class="alerts"><div class="al-h"><b>신고가</b> ${nh} <span>· 근접 ${al.length-nh}</span></div><div class="al-list">${al.map(r=>`<button class="al-row kwbtn" data-id="${r.id}"><span class="al-k">${esc(r.keyword)}</span>${r.alerts.map(a=>`<span class="al-b ${a.kind}">${a.kind==='high'?'▲ ':''}${esc(a.metric)}${a.kind==='near'?' '+a.pct+'%':''}</span>`).join('')}</button>`).join('')}</div></div>`:'';
+  return abox+`<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
      <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
    ${f?'':`<div class="kcats">${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
-     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}</span><small>${S.sortBy==='score'?k.score:''}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
+     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><small>${S.sortBy==='score'?k.score:''}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
+async function loadAlerts(){try{S.alerts=await api('/api/alerts');S.alertIds={};S.alerts.forEach(r=>{if(r.highs)S.alertIds[r.id]=1});renderSaved()}catch(e){}}
+setInterval(loadAlerts,600000);
 async function loadSaved(){
-  S.ks=await api('/api/keywords');renderSaved();
+  S.ks=await api('/api/keywords');renderSaved();if(!S.alerts)loadAlerts();
   if(!S.kid&&!S.started&&S.ks.length){S.started=true;S.sel=[];await select(S.ks[0].id);S.autoSel=true}
 }
 async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
