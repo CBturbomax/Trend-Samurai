@@ -273,15 +273,26 @@ def do_mention(job):
                 page = _search_retry(job, page[-1] + 1, job["end"])
                 ts = ts + page
                 pages += 1
-            if len(page) == 100 and days > 400:  # 여러 해 → 해 단위로 다시
-                _split_years(job)
-                return _set(job, "done", f"{len(ts)}건 넘음 → 해 단위로 나눔")
-            if len(page) == 100:  # 너무 많음 → 달 단위로 다시
-                for m in reversed(months):
+            if len(page) == 100:  # 다 못 받음 → 받은 것 중 '끝난 달'은 저장하고, 나머지 기간만 다음 작업으로(전엔 전부 버림)
+                last_m = dt.datetime.fromtimestamp(ts[-1], dt.timezone.utc).strftime("%Y-%m")
+                cnt = {}
+                for t in ts:
+                    k = dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime("%Y-%m")
+                    cnt[k] = cnt.get(k, 0) + 1
+                for m in [m for m in months if m < last_m]:
+                    ma, mb = month_bounds(m)
+                    x("INSERT OR REPLACE INTO mention_windows VALUES(?,?,?,?,?,?,?)",
+                      (sub, job["term"], ma, mb, cnt.get(m, 0), "done" if today() >= dt.date.fromisoformat(mb) else "open", now_iso()))
+                rest = month_bounds(last_m)[0]
+                if rest <= job["start"]:   # 한 달 안에서도 다 못 받음 → 그 달은 달 단위 작업(끝까지 이어 받음)으로
                     _add(job["keyword_id"], "mention", 3 if not job["term"].startswith(CPFX) else 5, sub=sub,
-                         term=job["term"], month=m, start=month_bounds(m)[0], end=month_bounds(m)[1])
+                         term=job["term"], month=last_m, start=month_bounds(last_m)[0], end=month_bounds(last_m)[1])
+                    rest = month_bounds(last_m)[1]
+                if rest < job["end"]:
+                    _add(job["keyword_id"], "mention", 2 if not job["term"].startswith(CPFX) else 4, sub=sub,
+                         term=job["term"], month=job["month"], start=rest, end=job["end"])
                 state["sub_streak"][sub] = 0
-                return _set(job, "done", f"{len(ts)}건 넘음 → 달 단위로 나눔")
+                return _set(job, "done", f"{len(ts)}건 받음 → ~{last_m} 저장, 나머지는 이어서")
             cnt = {}
             for t in ts:
                 k = dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime("%Y-%m")
