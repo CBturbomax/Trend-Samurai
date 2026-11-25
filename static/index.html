@@ -607,7 +607,7 @@ function render(){
 }
 
 /* ───── 진행 패널 ───── */
-let lastDone=-1;
+let lastDone=-1,lastLoad=0;
 async function pollStatus(){
   if(S.kid){try{
     const s=await api('/api/status?kid='+S.kid),c=s.counts,done=c.done||0,total=Object.values(c).reduce((a,b)=>a+b,0),left=(c.queued||0)+(c.running||0);
@@ -623,7 +623,8 @@ async function pollStatus(){
       <span class="pchip">${ICO.google}구글 ${st(!pend(['trends']),pend(['trends'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.pin}핀터레스트 ${(d.trends_w||[]).some(t=>t.gprop==='pinterest'&&Object.keys(t.points).length)?st(true,'완료'):pend(['pin'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span>
       <span class="pchip">${ICO.tiktok}틱톡 ${tt?st(true,'완료'):'<span class="pst none">자료 없음</span>'}</span></div>`;
-    if(done!==lastDone){lastDone=done;await loadData(false)}
+    if(lastDone===-2)lastDone=done;   // 방금 불러왔으면 다시 받지 않음
+    if(done!==lastDone&&Date.now()-lastLoad>60000){lastDone=done;lastLoad=Date.now();await loadData(false)}   // 수집 중엔 1분에 한 번만 새로 그림
   }catch(e){}}
   setTimeout(pollStatus,3000);
 }
@@ -667,12 +668,17 @@ async function loadSaved(){
   S.ks=await api('/api/keywords');renderSaved();if(!S.alerts)loadAlerts();if(!S.data)render();
 
 }
+let selTok=0;
 async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
   if(S.sel.includes(id))S.sel=S.sel.filter(x=>x!==id);else S.sel.push(id);
-  if(!S.sel.length){S.kid=null;S.data=null;$('#progress').style.display='none';render();renderSaved();return}
-  S.kid=S.sel[S.sel.length-1];lastDone=-1;
-  for(const i of S.sel)if(!S.cmpData[i])S.cmpData[i]=await api('/api/keywords/'+i+'/data');
-  S.data=S.cmpData[S.kid];await loadData();renderSaved()}
+  renderSaved();   // 누른 즉시 선택 표시
+  if(!S.sel.length){S.kid=null;S.data=null;$('#progress').style.display='none';render();return}
+  const tok=++selTok;S.kid=S.sel[S.sel.length-1];
+  if(S.cmpData[S.kid]){S.data=S.cmpData[S.kid];render()}   // 받아 둔 게 있으면 바로 그림
+  else{S.data=null;$('#result').innerHTML='<section class="panel"><div class="box dim">불러오는 중…</div></section>'}
+  try{await Promise.all(S.sel.filter(i=>!S.cmpData[i]).map(async i=>{S.cmpData[i]=await api('/api/keywords/'+i+'/data')}))}catch(e){}
+  if(tok!==selTok)return;   // 그 사이 다른 걸 눌렀으면 이전 응답은 버림
+  S.data=S.cmpData[S.kid]||null;lastLoad=Date.now();lastDone=-2;render()}
 
 /* ───── 1단계: 후보 확인 ───── */
 $('#btnSuggest').onclick=async()=>{
@@ -694,7 +700,7 @@ const split=s=>(s||'').split(',').map(x=>x.trim()).filter(Boolean);
 const vals=sel=>[...document.querySelectorAll(sel+':checked')].map(x=>x.value);
 
 document.addEventListener('click',async e=>{
-  const t=e.target;
+  const t=e.target.closest('button,tr.kwbtn')||e.target;   // 버튼 안의 글자·아이콘을 눌러도 버튼으로 인식
   if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='reddit';select(r.id)}
   else if(t.closest('.kcat')){S.cat=t.closest('.kcat').dataset.cat;renderSaved()}
   else if(t.classList.contains('sortby')){S.sortBy=t.dataset.o;ls('kt_sort',S.sortBy);renderSaved()}
