@@ -119,6 +119,13 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .pstat{display:flex;flex-wrap:wrap;gap:10px}
 .pchip{display:inline-flex;align-items:center;gap:6px;padding:9px 12px;background:var(--panel-2);border:1px solid var(--line);font-weight:700}
 .pst.ok{color:#5BD08A}.pst.ing{color:var(--yellow)}.pst.none{color:var(--dim,#888)}
+.kgroups{display:flex;flex-direction:column;gap:8px}
+.kgroup{display:flex;gap:12px;align-items:baseline;background:none;border:none;padding:0}
+.kg-title{flex:0 0 88px;margin:0;font-size:12px;color:var(--dim,#8a94a0);font-weight:700}
+.kg-items{gap:5px}
+.kchip{padding:4px 10px;background:transparent;border:1px solid var(--line);font-weight:600;font-size:13px;color:var(--text);cursor:pointer}
+.kchip.on{background:rgba(255,255,255,.06);border-width:2px;font-weight:800}
+@media (max-width:600px){.kgroup{flex-direction:column;gap:4px}.kg-title{flex:none}}
 </style>
 </head>
 <body>
@@ -130,8 +137,8 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 
 <section class="panel" id="add">
   <div class="filters">
-    <label class="search-box"><input type="text" id="kw" placeholder="키워드 추가 — 예: blokees"></label>
-    <button class="btn main" id="btnSuggest">후보 찾기</button>
+    <label class="search-box"><input type="text" id="kw" placeholder="새 키워드"></label>
+    <button class="btn main" id="btnSuggest">추가</button>
   </div>
   <div id="cand" class="panel"></div>
   <div id="savedBox"></div>
@@ -154,7 +161,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=async(u,o)=>{const r=await fetch(u,o&&{method:o.method||'POST',headers:{'content-type':'application/json'},body:o.body&&JSON.stringify(o.body)});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);return r.json()};
 const PAL=['#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#B0BEC5'], Y='#FFCB05';
-const S={geo:'US',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
+const S={sel:[],geo:'US',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
 const REG={};
 
 /* ───── 숫자·날짜 ───── */
@@ -398,15 +405,27 @@ function viewTiktok(d){
   return '<div class="box dim">틱톡 자료 없음</div>';
 }
 function viewGoogle(d){return trendChart(d,'web')}
+const KC=['#FFCB05','#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#F48FB1','#B0BEC5'];
+const kcol=id=>KC[Math.max(0,S.sel.indexOf(id))%KC.length];
+function redditPts(d,i){   // 전용 커뮤니티 전체 + 언급 커뮤니티 합계(달별)
+  const parts=[...Object.values(d.own).map(ms=>Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))),
+    ...Object.values(d[i?'mentions_c':'mentions']||{}).map(ms=>Object.fromEntries(Object.entries(ms).map(([m,by])=>[m,Object.values(by).reduce((a,b)=>a+b,0)])))];
+  const pts={};d.months.forEach(m=>{const v=parts.map(p=>p[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});return pts}
 function viewCompare(){
-  const ds=[...S.cmp].map(id=>S.cmpData[id]).filter(Boolean);
-  if(ds.length<2)return '<div class="box dim">비교할 키워드를 2개 이상 체크</div>';
-  const base=ds[0],mk=(f)=>ds.map((d,i)=>{const l=f(d),s=l.length>1&&l[0].name==='합계'?l[0]:l.length>1?sumSeries('',l,d.months):l[0]||{pts:{}};return{name:d.keyword,color:PAL[i%PAL.length],pts:s.pts}});
-  const o={months:base.months,cur:base.cur_month,foot:''};
-  return chart('cmp-c',{...o,title:'키워드 비교 · 전용 서브레딧 '+UN().t+'댓글 수',desc:UN().u,source:'arctic-shift',series:mk(d=>ownSeries(d,1))})
-   + chart('cmp-p',{...o,title:'키워드 비교 · 전용 서브레딧 '+UN().t+'글 수',desc:UN().u,source:'arctic-shift',series:mk(d=>ownSeries(d,0))})
-   + chart('cmp-m',{...o,title:'키워드 비교 · 다른 서브레딧 언급 글 수',desc:'개/월',source:'arctic-shift 글 검색',series:mk(d=>mentionBySub(d))})
-   ;
+  const ds=S.sel.map(id=>S.cmpData[id]).filter(Boolean);if(ds.length<2)return '<div class="box dim">불러오는 중</div>';
+  const base=ds[0],o={months:base.months,cur:base.cur_month,foot:''};
+  const mk=f=>ds.map(d=>({name:d.keyword,color:kcol(d.id),pts:f(d)}));
+  if(S.tab==='reddit')return chart('cmp-rp',{...o,title:'레딧 · 키워드 관련 글 수',desc:'개/월',source:'arctic-shift',series:mk(d=>redditPts(d,0))})
+    +chart('cmp-rc',{...o,title:'레딧 · 키워드 관련 댓글 수',desc:'개/월',source:'arctic-shift',series:mk(d=>redditPts(d,1))});
+  if(S.tab==='yt')return chart('cmp-yn',{...o,title:'유튜브 · 월별 업로드 영상 수',desc:'개/월',source:'YouTube',series:mk(d=>ytSeries(d,0,'',PAL[0]).pts)})
+    +chart('cmp-yv',{...o,title:'유튜브 · 조회수 합 (올라온 달 기준)',desc:'회',source:'YouTube',series:mk(d=>ytSeries(d,1,'',PAL[0]).pts)});
+  if(S.tab==='google'){const g=(gp)=>mk(d=>{const s=trendMain(d,gp,S.geo);return s?s.pts:{}});
+    return chart('cmp-gw',{...o,title:`구글 · 검색 관심도 (${GEO[S.geo]})`,desc:'키워드마다 따로 0~100',source:'Google Trends',series:g('web')})
+     +chart('cmp-gy',{...o,title:`유튜브 검색 관심도 (${GEO[S.geo]})`,desc:'키워드마다 따로 0~100',source:'Google Trends',series:g('youtube')});}
+  if(S.tab==='tiktok'){const weeks=[...new Set(ds.flatMap(d=>(d.tiktok_history||[]).map(r=>r.week)))].sort();
+    const ser=ds.filter(d=>(d.tiktok_history||[]).length).map(d=>{const h=d.tiktok_history,mx=Math.max(...h.map(r=>r.value))||1;return{name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(h.map(r=>[r.week,Math.round(r.value/mx*1000)/10]))}});
+    return ser.length?chart('cmp-tt',{daily:true,months:weeks,cur:null,title:'틱톡 · 주간 추이',desc:'키워드마다 최고=100',source:'TickerTrends',foot:'',series:ser}):'<div class="box dim">틱톡 자료 없음</div>';}
+  return '<div class="box dim">요약표는 키워드 하나씩</div>';
 }
 const ICO={
  reddit:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#FF4500"/><ellipse cx="10" cy="11.5" rx="6" ry="4.2" fill="#fff"/><circle cx="7.7" cy="11" r="1" fill="#FF4500"/><circle cx="12.3" cy="11" r="1" fill="#FF4500"/><circle cx="13.6" cy="4.6" r="1.3" fill="#fff"/><path d="M10 7.3 11 4.2 13.6 4.6" stroke="#fff" stroke-width=".9" fill="none"/></svg>',
@@ -414,8 +433,8 @@ const ICO={
  google:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#fff"/><path d="M10 4.2a5.8 5.8 0 1 0 5.6 7.1H10V8.9h8" fill="none" stroke="#4285F4" stroke-width="2.6"/><path d="M4.6 7.6A5.8 5.8 0 0 1 14 5.6" fill="none" stroke="#EA4335" stroke-width="2.6"/><path d="M4.4 12.3a5.8 5.8 0 0 0 1.6 2.3" fill="none" stroke="#FBBC05" stroke-width="2.6"/><path d="M6 14.6a5.8 5.8 0 0 0 8 .6" fill="none" stroke="#34A853" stroke-width="2.6"/></svg>',
  tiktok:'<svg class="ico" viewBox="0 0 20 20"><rect width="20" height="20" rx="5" fill="#000"/><text x="10.8" y="15.2" font-size="13" font-weight="900" text-anchor="middle" fill="#FE2C55">♪</text><text x="9.4" y="14.2" font-size="13" font-weight="900" text-anchor="middle" fill="#25F4EE">♪</text><text x="10" y="14.7" font-size="13" font-weight="900" text-anchor="middle" fill="#fff">♪</text></svg>'};
 const PLAT={reddit:{c:'#FF4500',i:ICO.reddit},yt:{c:'#FF0000',i:ICO.yt},google:{c:'#4285F4',i:ICO.google},tiktok:{c:'#25F4EE',i:ICO.tiktok}};
-const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글'],['year','요약표'],['cmp','키워드 비교']];
-const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,year:yearTable,cmp:viewCompare};
+const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글'],['year','요약표']];
+const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,year:yearTable};
 function kpis(d){
   const lm=d.months[d.months.length-2],sum=l=>{const v=l.map(s=>s.pts[lm]).filter(v=>v!=null);return v.length?v.reduce((a,b)=>a+b,0):null};
   const k=(cls,label,v)=>`<div class="kpi ${cls}"><span class="kpi-label">${label}</span><strong class="kpi-num">${v}</strong></div>`;
@@ -426,6 +445,14 @@ function kpis(d){
 }
 function render(){
   const d=S.data;if(!d){$('#result').innerHTML='';$('#kpis').innerHTML='';return}
+  if(S.sel.length>1){   // 여러 키워드 선택 → 겹쳐서 비교
+    if(S.tab==='year')S.tab='reddit';
+    $('#kpis').innerHTML='';$('#progress').style.display='none';
+    const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
+    $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
+      <div class="filters">${tg2(TABS.filter(t=>t[0]!=='year'),'tab',S.tab,'tab')}</div>
+      <div class="filters">${tg2([['all','전체(2019~)'],['3y','최근 3년'],['1y','최근 1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}<button class="btn" id="btnSelClear">비교 끝내기</button></div></section>`+viewCompare();
+    return}
   $('#kpis').innerHTML=kpis(d);
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
   $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span>
@@ -449,7 +476,7 @@ async function pollStatus(){
     const bk=s.by_kind||[],pend=kinds=>bk.some(r=>kinds.includes(r.kind)&&['queued','running','hold'].includes(r.status));
     const d=S.data||{},st=(on,txt)=>`<span class="pst ${on?'ok':'ing'}">${on?'✓':'…'} ${txt}</span>`;
     const tt=d.tiktok_history&&d.tiktok_history.length;
-    p.style.display='';
+    p.style.display=S.sel.length>1?'none':'';
     p.innerHTML=`<div class="pstat">
       <span class="pchip">${ICO.reddit}레딧 ${st(!pend(['mention','totals','discover']),pend(['mention','totals','discover'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.yt}유튜브 ${st(!pend(['yt','ytstats']),pend(['yt','ytstats'])?'받는 중':'완료')}</span>
@@ -474,17 +501,19 @@ function savedHtml(){
   const groups={};ks.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
   const names=[...order.filter(g=>groups[g]),...Object.keys(groups).filter(g=>!order.includes(g))];
   const tg=`<div class="toggle-group">${[['category','카테고리별'],['country','국가별']].map(([k,n])=>`<button class="toggle grpby ${S.groupBy===k?'on':''}" data-g="${k}">${n}</button>`).join('')}</div>`;
-  const cmpN=S.cmp.size;
-  return `<div class="filters">${tg}<label class="search-box" style="flex:0 1 260px;min-width:180px"><input type="text" id="kwFilter" placeholder="키워드 찾기" value="${esc(S.kwq)}"></label>
-    <span class="small dim">${S.ks.length}개 · 비교 ${cmpN?cmpN+'개 선택':'하려면 ☐ 체크'}</span></div>
-   <div class="kgroups">${names.map(g=>`<div class="kgroup"><div class="kg-title">${esc(g)} <span class="dim">${groups[g].length}</span></div><div class="kg-items">${groups[g].map(k=>`<span class="kchip ${k.id===S.kid?'on':''}"><input type="checkbox" class="cmpck" value="${k.id}" ${S.cmp.has(k.id)?'checked':''} title="비교에 넣기"><button class="kwbtn" data-id="${k.id}">${esc(k.name)}</button></span>`).join('')}</div></div>`).join('')||'<span class="dim">없음</span>'}</div>`;
+  return `<div class="filters">${tg}<label class="search-box" style="flex:0 1 220px;min-width:160px"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length>1?`<button class="btn" id="btnSelClear">비교 끝내기</button>`:''}</div>
+   <div class="kgroups">${names.map(g=>`<div class="kgroup"><div class="kg-title">${esc(g)}</div><div class="kg-items">${groups[g].map(k=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';return `<button class="kchip kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''}>${esc(k.name)}</button>`}).join('')}</div></div>`).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadSaved(){
   S.ks=await api('/api/keywords');renderSaved();
-  if(!S.kid&&S.ks.length)select(S.ks[0].id);
+  if(!S.kid&&S.ks.length){S.sel=[];select(S.ks[0].id)}
 }
-async function select(id){S.kid=id;lastDone=-1;S.data=null;await loadData();loadSaved()}
+async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
+  if(S.sel.includes(id)){if(S.sel.length===1)return;S.sel=S.sel.filter(x=>x!==id)}else S.sel.push(id);
+  S.kid=S.sel[S.sel.length-1];lastDone=-1;
+  for(const i of S.sel)if(!S.cmpData[i])S.cmpData[i]=await api('/api/keywords/'+i+'/data');
+  S.data=S.cmpData[S.kid];await loadData();renderSaved()}
 
 /* ───── 1단계: 후보 확인 ───── */
 $('#btnSuggest').onclick=async()=>{
@@ -523,13 +552,13 @@ document.addEventListener('click',async e=>{
   else if(t.id==='btnCsv')location.href=`/api/keywords/${S.kid}/export.csv`;
   else if(t.id==='btnFull'){await api(`/api/keywords/${S.kid}/full`,{});await loadData()}
   else if(t.id==='btnRefresh'){await api(`/api/keywords/${S.kid}/refresh`,{});lastDone=-1}
-  else if(t.id==='btnDel'){if(confirm(`'${S.data.keyword}' 키워드와 수집 대기열을 삭제할까요?`)){await api('/api/keywords/'+S.kid,{method:'DELETE'});S.cmp.delete(S.kid);S.kid=null;S.data=null;$('#progress').style.display='none';render();loadSaved()}}
+  else if(t.id==='btnDel'){if(confirm(`'${S.data.keyword}' 키워드와 수집 대기열을 삭제할까요?`)){await api('/api/keywords/'+S.kid,{method:'DELETE'});S.sel=S.sel.filter(x=>x!==S.kid);S.kid=S.sel[0]||null;S.data=null;$('#progress').style.display='none';render();loadSaved()}}
   else if(t.id==='btnHtml')exportHtml();
+  else if(t.id==='btnSelClear'){S.sel=[S.kid];renderSaved();render()}
 });
 document.addEventListener('input',e=>{if(e.target.id==='kwFilter'){S.kwq=e.target.value;renderSaved()}});
 document.addEventListener('change',async e=>{if(e.target.classList.contains('gsel')){const c=$('#gCat').value,n=$('#gCtr').value;await api(`/api/keywords/${S.kid}/group`,{body:{category:c,country:n}});S.ks=await api('/api/keywords');renderSaved();return}
-if(e.target.classList.contains('cmpck')){const id=+e.target.value;e.target.checked?S.cmp.add(id):S.cmp.delete(id);renderSaved();
-  for(const i of S.cmp)if(!S.cmpData[i])S.cmpData[i]=await api('/api/keywords/'+i+'/data');if(S.cmp.size>=2)S.tab='cmp';render()}});
+});
 
 /* ───── 내보내기: 차트 포함 단일 HTML ───── */
 function exportHtml(){
