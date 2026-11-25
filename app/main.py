@@ -528,7 +528,7 @@ _ALERT = {"t": 0.0, "v": None}
 
 
 def _highs(name, pts, cur, min_n=12):
-    """pts: {기간: 값}. 마지막 완료 기간 값이 이전 최고 이상이면 신고가, 최고의 90% 이상이면 근접."""
+    """pts: {기간: 값}. 마지막 완료 기간 값이 이전 최고를 넘으면 신고가, 최고의 95% 이상이면 근접."""
     ks = sorted(k for k, v in pts.items() if v is not None and k != cur)
     if len(ks) < min_n:
         return None
@@ -537,9 +537,11 @@ def _highs(name, pts, cur, min_n=12):
     top = max(prev, v)
     if top <= 0 or v <= 0:
         return None
-    if v >= prev:
+    if sum(1 for k in ks if pts[k] == top) >= 2:   # 최고값이 여러 달 같음 = 수집 한도에 걸린 값(진짜 신고가 아님)
+        return None
+    if v > prev:
         return {"metric": name, "kind": "high", "at": last, "value": v, "pct": 100}
-    if v >= 0.9 * top:
+    if v >= 0.95 * top:
         return {"metric": name, "kind": "near", "at": last, "value": v, "pct": round(v / top * 100)}
     return None
 
@@ -571,7 +573,7 @@ def keyword_alerts(d):
 
 @app.get("/api/alerts")
 def alerts():
-    """지표별 신고가(최근 완료 기간이 역대 최고 이상) 또는 근접(최고의 90% 이상) 키워드. 10분 캐시."""
+    """지표별 신고가(최근 완료 기간이 역대 최고 초과) 또는 근접(최고의 95% 이상) 키워드. 10분 캐시."""
     if _ALERT["v"] is not None and time.time() - _ALERT["t"] < 600:
         return _ALERT["v"]
     res = []
