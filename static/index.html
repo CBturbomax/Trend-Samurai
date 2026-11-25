@@ -116,6 +116,9 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .toggle[data-tab="tiktok"].on{background:#111;border-color:#25F4EE;color:#fff;box-shadow:inset 0 -3px 0 #FE2C55}
 .toggle[data-tab="yt"].on .ico rect{fill:#fff}.toggle[data-tab="yt"].on .ico path{fill:#FF0000}
 .toggle[data-tab="reddit"].on .ico circle:first-child{fill:#fff}.toggle[data-tab="reddit"].on .ico ellipse{fill:#FF4500}.toggle[data-tab="reddit"].on .ico circle:nth-of-type(2),.toggle[data-tab="reddit"].on .ico circle:nth-of-type(3){fill:#fff}.toggle[data-tab="reddit"].on .ico circle:nth-of-type(4){fill:#FF4500}.toggle[data-tab="reddit"].on .ico path{stroke:#FF4500}
+.pstat{display:flex;flex-wrap:wrap;gap:10px}
+.pchip{display:inline-flex;align-items:center;gap:6px;padding:9px 12px;background:var(--panel-2);border:1px solid var(--line);font-weight:700}
+.pst.ok{color:#5BD08A}.pst.ing{color:var(--yellow)}.pst.none{color:var(--dim,#888)}
 </style>
 </head>
 <body>
@@ -419,7 +422,7 @@ function kpis(d){
   const yt=(d.youtube||{}).months||{},g=trendMain(d,'web',S.geo);
   return k('is-todo','레딧 · '+UN().t+'댓글',fmtS(sum(ownSeries(d,1)))||'–')+k('is-todo','레딧 · '+UN().t+'글',fmtS(sum(ownSeries(d,0)))||'–')
     +k('is-red','유튜브 · 업로드 영상',yt[lm]?fmtS(yt[lm][0]):'–')+k('is-blue',`구글 · 검색 관심도 (${GEO[S.geo]})`,g&&g.pts[lm]!=null?fmtS(g.pts[lm]):'–')
-    +k('is-total','수집 진행',`<span id="kpiProg">${S.prog==null?'–':S.prog+'%'}</span>`);
+;
 }
 function render(){
   const d=S.data;if(!d){$('#result').innerHTML='';$('#kpis').innerHTML='';return}
@@ -442,15 +445,16 @@ async function pollStatus(){
   if(S.kid){try{
     const s=await api('/api/status?kid='+S.kid),c=s.counts,done=c.done||0,total=Object.values(c).reduce((a,b)=>a+b,0),left=(c.queued||0)+(c.running||0);
     const p=$('#progress');p.style.display=total?'':'none';S.prog=total?Math.round(done/total*100):null;const kp=$('#kpiProg');if(kp)kp.textContent=S.prog==null?'–':S.prog+'%';
-    const cur=s.current?(s.current_kid===S.kid?s.current:'다른 키워드 수집 중 — '+s.current):left?'대기 중':'수집 완료 · 쉬는 중';
-    const rest=total-done,dp=total?done/total*100:0;
-    p.innerHTML=`<div class="panel-head"><h2>수집 진행</h2><span class="count">${esc(cur)}${s.cooldown>0?` <span class="warn">· 서버 과부하 응답으로 ${s.cooldown}초 쉬는 중</span>`:''}</span></div>
-     <div class="progress-bar"><div class="progress-seg done" style="width:${dp}%">${dp>=12?`완료 ${done}`:''}</div><div class="progress-seg todo" style="width:${100-dp}%">${dp<=88?`남음 ${rest}`:''}</div></div>
-     <div class="progress-legend"><span><i class="swatch done"></i>완료 ${done}</span><span><i class="swatch todo"></i>남음 ${rest}</span><span>보류 ${c.hold||0} · 실패 ${c.failed||0}</span></div>
-     ${s.holds.length?`<div class="box small"><b class="warn">보류·실패한 구간</b> ${s.holds.map(h=>`<div>${h.sub?'r/'+esc(h.sub):'구글 트렌드'} ${h.term?`'${esc(h.term)}'`:''} ${h.first?`${h.first.slice(0,7)} ~ ${h.last.slice(0,7)}`:''} · ${h.n}개 · <span class="dim">${esc(h.msg||'')}</span>${h.next_at>s.now?` · ${Math.ceil((h.next_at-s.now)/60)}분 뒤 재시도`:''}</div>`).join('')}</div>`:''}`;
-    if(!S.hTick||Date.now()-S.hTick>30000){S.hTick=Date.now();try{S.health=await api('/api/health')}catch(e){}}
-    if(S.health){const h=S.health,src=Object.values(h.sources).filter(x=>x.n30),line=src.map(x=>`${x.name} ${Math.round(x.ok30/x.n30*100)}% 성공 (30분 ${x.n30}건${x.gap?` · ${x.gap>=60?Math.round(x.gap/60)+'분':x.gap+'초'} 간격`:''})`).join(' · ');
-      p.insertAdjacentHTML('beforeend',`<details class="manage small"><summary>자동 조절: ${esc(line||'대기 중')}</summary><div style="margin-top:8px">${h.log.slice(0,15).map(l=>`<div><span class="dim">${l.t}</span> ${esc(l.msg)}</div>`).join('')||'<span class="dim">아직 조절 내역 없음</span>'}</div></details>`)}
+    // 플랫폼별로 '다 받음 / 받는 중'만 보여 줌
+    const bk=s.by_kind||[],pend=kinds=>bk.some(r=>kinds.includes(r.kind)&&['queued','running','hold'].includes(r.status));
+    const d=S.data||{},st=(on,txt)=>`<span class="pst ${on?'ok':'ing'}">${on?'✓':'…'} ${txt}</span>`;
+    const tt=d.tiktok_history&&d.tiktok_history.length;
+    p.style.display='';
+    p.innerHTML=`<div class="pstat">
+      <span class="pchip">${ICO.reddit}레딧 ${st(!pend(['mention','totals','discover']),pend(['mention','totals','discover'])?'받는 중':'완료')}</span>
+      <span class="pchip">${ICO.yt}유튜브 ${st(!pend(['yt','ytstats']),pend(['yt','ytstats'])?'받는 중':'완료')}</span>
+      <span class="pchip">${ICO.google}구글 ${st(!pend(['trends']),pend(['trends'])?'받는 중':'완료')}</span>
+      <span class="pchip">${ICO.tiktok}틱톡 ${tt?st(true,'완료'):'<span class="pst none">자료 없음</span>'}</span></div>`;
     if(done!==lastDone){lastDone=done;await loadData(false)}
   }catch(e){}}
   setTimeout(pollStatus,3000);
