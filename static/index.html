@@ -209,6 +209,22 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .mx td.mx-h,.mx td.mx-p,.mx td.mx-n{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 .mx td.mx-h{color:#3fb950;background:rgba(63,185,80,.08)}.mx td.mx-p{color:#d9b84a}.mx td.mx-n{color:#3a4550}
 @media(max-width:640px){.mx{table-layout:auto}.mx colgroup{display:none}.mx th:nth-child(2),.mx td:nth-child(2){display:none}.mx th,.mx td{padding:6px 5px;font-size:11px}}
+/* ── 크게 ── */
+.panel-head h2{font-size:22px}
+.toggle{font-size:15px;padding:10px 18px}
+.btn{font-size:14px;padding:9px 16px}
+.kw-search{flex:0 1 280px}
+.kcats{margin:6px 0 16px}
+.kcat{font-size:16px;padding:12px 18px}.kcat span{font-size:13px}
+.kgrid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.kcell{font-size:16px;padding:13px 14px;gap:10px}.kcell em{font-size:13px;min-width:20px}.kcell small{font-size:13px}.kcell.on{padding:12px 13px}
+.al-head h3{font-size:19px}.al-k1,.al-k2{font-size:22px}.al-l{font-size:14px}
+.al-wrap{max-height:320px}
+.mx{font-size:15px}.mx th{font-size:13px;padding:10px 14px}.mx td{padding:10px 14px}.mx-c,.mx-d{font-size:14px}
+.chart-panel h2{font-size:20px}.chd-v{font-size:34px}.chd-m,.chd-c{font-size:14px}
+.lg{font-size:14px;padding:6px 12px}
+.empty-chart svg{display:block;width:100%;height:auto}
+@media(max-width:640px){.kgrid{grid-template-columns:repeat(2,1fr)}.kcell{font-size:15px;padding:11px 10px}.kcat{font-size:15px;padding:10px 12px}.toggle{font-size:14px;padding:8px 13px}.mx{font-size:13px}.mx th,.mx td{padding:8px 6px}}
 </style>
 </head>
 <body>
@@ -506,7 +522,15 @@ function kpis(d){
 ;
 }
 function render(){
-  const d=S.data;if(!d){$('#result').innerHTML='';$('#kpis').innerHTML='';return}
+  const d=S.data;
+  if(!d){   // 키워드를 고르기 전: 탭과 빈 차트 틀을 보여 줌
+    const T={reddit:'레딧 · 키워드 관련 글 수',yt:'유튜브 · 월별 업로드 영상 수',tiktok:'틱톡 · 주간 조회수',google:'구글 · 검색 관심도'};
+    const pl=PLAT[S.tab]||PLAT.reddit,Z=SZ(),{W,H,L,R,T:Tp,B,f}=Z;
+    let g='';for(let i=0;i<=4;i++){const y=Tp+(H-Tp-B)*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#fff" stroke-opacity="${i===4?.18:.06}"/>`}
+    $('#result').innerHTML=`<section class="panel"><div class="filters">${`<div class="toggle-group">${TABS.map(([k,n])=>`<button class="toggle tab ${S.tab===k?'on':''}" data-tab="${k}">${n}</button>`).join('')}</div>`}</div></section>
+     <section class="panel chart-panel" style="--acc:${pl.c}"><div class="panel-head"><h2>${pl.i}${T[S.tab]||T.reddit}</h2></div>
+     <div class="chart-box empty-chart"><svg viewBox="0 0 ${W} ${H}">${g}<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="#7d8996" font-size="${f+3}">키워드를 선택하세요</text></svg></div></section>`;
+    return}
   if(S.sel.length>1){   // 여러 키워드 선택 → 겹쳐서 비교
     if(S.tab==='year')S.tab='reddit';
     $('#kpis').innerHTML='';$('#progress').style.display='none';
@@ -556,13 +580,13 @@ const CTRS=['한국','미국','일본','중국','유럽','기타'];
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
 S.groupBy=ls('kt_group')||'category';S.sortBy=ls('kt_sort')||'score';S.kwq='';S.ks=[];
 function savedHtml(){
-  const key=S.groupBy,order=key==='category'?CATS:CTRS,f=S.kwq.trim().toLowerCase();
-  const all=[...S.ks].sort((a,b)=>S.sortBy==='rank'?a.rank-b.rank:b.score-a.score);
+  const key='category',order=CATS,f=S.kwq.trim().toLowerCase();
+  const all=[...S.ks].sort((a,b)=>b.score-a.score);
   const groups={};all.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
   const names=[...order.filter(g=>groups[g]),...Object.keys(groups).filter(g=>!order.includes(g))];
-  if(!S.cat||!groups[S.cat]){const cur=S.ks.find(k=>k.id===S.kid);S.cat=(cur&&(cur[key]||'미분류'))||names[0]}
+  if(!S.cat||(S.cat!=='전체'&&!groups[S.cat]))S.cat='전체';
   const seg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
-  const list=f?all.filter(k=>k.name.includes(f)):groups[S.cat]||[];
+  const list=f?all.filter(k=>k.name.includes(f)):S.cat==='전체'?all:groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
   const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수'];
@@ -572,17 +596,16 @@ function savedHtml(){
    <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="r" title="${m}">${m.split(' ')[0]}</th>`).join('')}<th class="r">기준</th></tr></thead>
    <tbody>${al.map(r=>{const by=Object.fromEntries(r.alerts.map(a=>[a.metric,a]));const at=r.alerts.map(a=>a.at.slice(0,7)).sort().pop();
      return `<tr class="kwbtn" data-id="${r.id}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m])).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
-  return abox+`<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
-     <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
-   ${f?'':`<div class="kcats">${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
+  return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
+   ${f?'':`<div class="kcats"><button class="kcat ${S.cat==='전체'?'on':''}" data-cat="전체">전체<span>${all.length}</span></button>${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
-     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><small>${S.sortBy==='score'?k.score:''}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
+     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><small>${k.score}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadAlerts(){try{S.alerts=await api('/api/alerts');S.alertIds={};S.alerts.forEach(r=>{if(r.highs)S.alertIds[r.id]=1});renderSaved()}catch(e){}}
 setInterval(loadAlerts,600000);
 async function loadSaved(){
-  S.ks=await api('/api/keywords');renderSaved();if(!S.alerts)loadAlerts();
+  S.ks=await api('/api/keywords');renderSaved();if(!S.alerts)loadAlerts();if(!S.data)render();
 
 }
 async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
