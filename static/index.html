@@ -507,9 +507,10 @@ function savedHtml(){
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadSaved(){
   S.ks=await api('/api/keywords');renderSaved();
-  if(!S.kid&&S.ks.length){S.sel=[];select(S.ks[0].id)}
+  if(!S.kid&&S.ks.length){S.sel=[];await select(S.ks[0].id);S.autoSel=true}
 }
 async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
+  if(S.autoSel){S.autoSel=false;S.sel=[]}   // 처음 자동으로 열린 키워드는 첫 클릭 때 바꿔 끼움
   if(S.sel.includes(id)){if(S.sel.length===1)return;S.sel=S.sel.filter(x=>x!==id)}else S.sel.push(id);
   S.kid=S.sel[S.sel.length-1];lastDone=-1;
   for(const i of S.sel)if(!S.cmpData[i])S.cmpData[i]=await api('/api/keywords/'+i+'/data');
