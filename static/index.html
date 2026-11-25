@@ -208,7 +208,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .mx-k{font-weight:800;color:#fff}.mx-c{color:#7d8996;font-size:12px}.mx-d{color:#8b96a2;font-variant-numeric:tabular-nums;font-size:12px}
 .mx td.mx-h,.mx td.mx-p,.mx td.mx-n{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
 .mx td.mx-h{color:#3fb950;background:rgba(63,185,80,.08)}.mx td.mx-p{color:#d9b84a}.mx td.mx-n{color:#3a4550}
-@media(max-width:640px){.mx col.c-c{width:0}.mx th:nth-child(2),.mx td:nth-child(2){display:none}.mx col.c-k{width:28%}.mx th,.mx td{padding:6px 6px;font-size:11px}}
+@media(max-width:640px){.mx{table-layout:auto}.mx colgroup{display:none}.mx th:nth-child(2),.mx td:nth-child(2){display:none}.mx th,.mx td{padding:6px 5px;font-size:11px}}
 </style>
 </head>
 <body>
@@ -569,7 +569,7 @@ function savedHtml(){
   const cell=a=>!a?'<td class="mx-n">·</td>':a.kind==='high'?'<td class="mx-h">신고가</td>':`<td class="mx-p">${a.pct}%</td>`;
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
    <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
-   <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="r">${m}</th>`).join('')}<th class="r">기준</th></tr></thead>
+   <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="r" title="${m}">${m.split(' ')[0]}</th>`).join('')}<th class="r">기준</th></tr></thead>
    <tbody>${al.map(r=>{const by=Object.fromEntries(r.alerts.map(a=>[a.metric,a]));const at=r.alerts.map(a=>a.at.slice(0,7)).sort().pop();
      return `<tr class="kwbtn" data-id="${r.id}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m])).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
   return abox+`<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
