@@ -166,7 +166,7 @@ function visMonths(ms){const n=S.range==='1y'?13:S.range==='3y'?37:ms.length;ret
    series: [{name,color,pts:{'2024-01':값|null}}]  o:{title,desc,source,foot,months,cur} */
 function chart(id,o){
   const pl=PLAT[S.tab];
-  if(pl)o.series.forEach(x=>{if(x.bold||x.isTotal)x.color=pl.c});
+  if(pl)o.series.forEach(x=>{if(x.bold||x.isTotal||o.series.length===1)x.color=pl.c});
   const hid=S.hidden[id]||(S.hidden[id]=new Set(o.defaultHidden||[]));
   // 합산 차트: part 표시된 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
   const parts=o.series.filter(s=>s.part),inc=parts.filter(s=>!hid.has(s.name));
