@@ -1,0 +1,118 @@
+# 키워드 중요도 순서(위가 더 중요). 같은 카테고리 안에서 이 순서로 보여 줌. 여기 없는 키워드는 뒤에.
+# 뷰티
+medicube
+elf cosmetics
+rhode
+sulwhasoo
+shiseido
+beauty of joseon
+kbeauty
+anessa
+biore
+kose
+hada labo
+centellian24
+dr althea
+biodance
+iope
+wellage
+mcobeauty
+catrice
+# 식음료
+buldak
+celsius
+alani nu
+poppi
+nissin
+bibigo
+yakult
+kikkoman
+maruchan
+kewpie
+calbee
+ito en
+kimbap
+korean street food
+# 리테일·외식
+ulta
+cava
+dutch bros
+wingstop
+sweetgreen
+gamestop
+muji
+donki
+kura sushi
+sushiro
+# 패션·신발
+lululemon
+on running
+hoka
+uniqlo
+crocs
+birkenstock
+skims
+ugg
+asics
+onitsuka tiger
+aritzia
+abercrombie
+victoria's secret
+prada
+alo yoga
+athleta
+saucony
+brooks running
+figs scrubs
+sweaty betty
+massimo dutti
+zegna
+human made
+# 스포츠·아웃도어
+arcteryx
+salomon
+shimano
+yonex
+goldwin
+# 완구·캐릭터
+popmart
+pokemon cards
+sanrio
+hello kitty
+kuromi
+jellycat
+funko
+bandai
+gundam
+one piece card game
+takara tomy
+tamagotchi
+sonny angel
+build-a-bear
+toniebox
+blokees
+52toys
+squishies
+# 게임·전자
+nintendo switch
+playstation
+ray-ban meta
+capcom
+square enix
+sega
+konami
+g-shock
+casio
+seiko
+citizen watch
+alphatheta
+pioneer dj
+# 헬스케어
+zepbound
+wegovy
+retatrutide
+hims
+# 생활용품
+sharkninja
+yeti
+zojirushi

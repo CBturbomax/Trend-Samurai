@@ -232,7 +232,10 @@ def keywords():
     score = {r["keyword_id"]: r["v"] for r in q(
         "SELECT keyword_id, SUM(views) v FROM yt_videos WHERE published>=? GROUP BY keyword_id", (since,))}
     rows = [dict(r) | {"score": score.get(r["id"], 0) or 0} for r in q("SELECT id,name,category,country FROM keywords")]
-    return sorted(rows, key=lambda r: (-r["score"], r["name"]))
+    f = C.ROOT / "seed" / "importance.txt"
+    order = [l.strip().lower() for l in f.read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")] if f.exists() else []
+    rank = {n: i for i, n in enumerate(order)}
+    return sorted(rows, key=lambda r: (rank.get(r["name"], 10 ** 6), -r["score"], r["name"]))
 
 
 class GroupIn(BaseModel):
