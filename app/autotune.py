@@ -17,7 +17,7 @@ LOG = collections.deque(maxlen=60)
 PAUSE = {}   # source → 이 시각까지 쉼
 BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (0.8, 10.0)}
 GAPS = {"arctic": C.ARCTIC_GAP, "trends": 180.0, "youtube": C.YT_WEB_GAP}
-NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡"}
+NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡", "pinterest": "핀터레스트"}
 
 
 def record(src, ok):
@@ -101,7 +101,7 @@ def tune():
 
 def summary():
     out = {}
-    for src in ("arctic", "youtube", "trends", "tiktok"):
+    for src in ("arctic", "youtube", "trends", "tiktok", "pinterest"):
         n, ok = _window(src, 1800)
         out[src] = {"name": NAMES[src], "n30": n, "ok30": ok, "gap": GAPS.get(src)}
     return out

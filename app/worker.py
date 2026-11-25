@@ -6,7 +6,7 @@ import time
 from . import autotune
 from . import config as C
 from .db import q, x
-from .sources import arctic, pullpush, tiktok, trends, youtube, youtube_web
+from .sources import arctic, pinterest, pullpush, tiktok, trends, youtube, youtube_web
 
 state = {"current": None, "cooldown_until": 0.0, "streak": 0, "next_ok": 0.0,
          "sub_streak": {}, "note": "", "pp_next": 0.0, "pp_streak": 0}
@@ -102,6 +102,11 @@ def enqueue_keyword(kid, refresh=False):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
         if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
             _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
+    # 핀터레스트 주간(미국): 6일 안에 받은 게 없으면 다시
+    wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
+    if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop='pinterest' AND geo='US' AND updated_at>? LIMIT 1", (kid, wk)) \
+            and not q("SELECT 1 FROM meta WHERE key=? AND updated_at>?", (f"pin_none:{kid}", time.time() - 6 * 86400)):
+        _add(kid, "pin", 0, gprop="pinterest", geo="US", month="W")
     done = {(r["kind"], r["month"]) for r in q(
         "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
     for m in reversed(all_months() if C.PULLPUSH_ENABLED else []):
@@ -796,7 +801,36 @@ def do_global(job):
     _set(job, "done")
 
 
-HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+HANDLERS = {"pin": do_pin, "tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+
+
+def do_pin(job):
+    kid = job["keyword_id"]
+    name = q("SELECT name FROM keywords WHERE id=?", (kid,))[0]["name"]
+    terms = list(dict.fromkeys([name] + [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))]))[:4]
+    pts, used = {}, None
+    for t in terms:   # 핀터레스트가 아는 표기가 나올 때까지(대표 이름 먼저)
+        try:
+            pts = pinterest.fetch(t, job["geo"])
+            autotune.record("pinterest", True)
+        except pinterest.PinError as e:
+            autotune.record("pinterest", False)
+            return _set(job, "queued", f"핀터레스트 {e} · 30분 뒤 재시도", time.time() + 1800, job["tries"] + 1)
+        time.sleep(3)
+        if pts:
+            used = t
+            break
+    if not pts:
+        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"pin_none:{kid}", "1", time.time()))
+        return _set(job, "done", "핀터레스트 자료 없음")
+    x("BEGIN")
+    x("DELETE FROM trends_w WHERE keyword_id=? AND gprop='pinterest' AND geo=?", (kid, job["geo"]))
+    last = max(pts)
+    for w, v in pts.items():
+        x("INSERT INTO trends_w VALUES(?,?,?,?,?,?,?)", (kid, "pinterest", job["geo"], w, v, 0, now_iso()))
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"pin_term:{kid}", used, time.time()))
+    x("COMMIT")
+    _set(job, "done", "")
 
 
 # 사이트별로 줄을 따로 세워 동시에 처리(같은 사이트 안에서는 여전히 한 번에 하나)
@@ -804,6 +838,7 @@ GROUPS = {
     "reddit": ("totals", "mention", "discover"),
     "youtube": ("yt", "ytc", "ytstats"),
     "etc": ("trends", "tiktok", "global"),
+    "pin": ("pin",),
 }
 
 
@@ -849,6 +884,8 @@ def describe(j):
         s = f"레딧 전체 {'글' if j['term'] == 'submission' else '댓글'} {j['month']} 검색"
     elif j["kind"] == "totals":
         s = f"r/{j['sub']} 월별 총계"
+    elif j["kind"] == "pin":
+        s = f"핀터레스트 트렌드 {j['geo']}"
     elif j["kind"] == "trends":
         s = f"구글 트렌드 {j['gprop']}·{j['geo']}"
     else:

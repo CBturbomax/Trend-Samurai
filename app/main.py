@@ -578,7 +578,7 @@ def build(kid: int):
         "own": own, "mentions": mentions, "trends": trends,
         "trends_w": [{"gprop": g, "geo": geo, "points": {r["week"]: [r["value"], r["partial"]] for r in q(
             "SELECT week,value,partial FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? ORDER BY week", (kid, g, geo))}}
-            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"))],
+            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("pinterest", "US"))],
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
             "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
@@ -623,6 +623,9 @@ def keyword_alerts(d):
                 for m, (v, _p) in t["points"].items():
                     s[m] = s.get(m, 0) + v
         out.append(_highs(label, s, cur))
+    pw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "pinterest" and t["points"]), None)
+    if pw:   # 핀터레스트 주간(미국, 최근 2년): 마지막 주가 지난 최고를 넘었나
+        out.append(_highs("핀터레스트 검색", {k: v[0] for k, v in sorted(pw.items())}, None, 26))
     # 유튜브 영상 수는 아직 달마다 받은 깊이(1차 3페이지/2차 8페이지)가 달라 최근 달이 높게 나옴 → 2차가 끝날 때까지 알림에서 제외
     rp = {}
     for ms in d["own"].values():

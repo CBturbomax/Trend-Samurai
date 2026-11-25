@@ -113,6 +113,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .toggle[data-tab="reddit"].on{background:#FF4500;border-color:#FF4500;color:#fff}
 .toggle[data-tab="yt"].on{background:#FF0000;border-color:#FF0000;color:#fff}
 .toggle[data-tab="google"].on{background:#4285F4;border-color:#4285F4;color:#fff}
+.toggle[data-tab="pin"].on{background:#E60023;border-color:#E60023;color:#fff}.toggle[data-tab="pin"].on .ico circle{fill:#fff}.toggle[data-tab="pin"].on .ico path{fill:#E60023}
 .toggle[data-tab="tiktok"].on{background:#111;border-color:#25F4EE;color:#fff;box-shadow:inset 0 -3px 0 #FE2C55}
 .toggle[data-tab="yt"].on .ico rect{fill:#fff}.toggle[data-tab="yt"].on .ico path{fill:#FF0000}
 .toggle[data-tab="reddit"].on .ico circle:first-child{fill:#fff}.toggle[data-tab="reddit"].on .ico ellipse{fill:#FF4500}.toggle[data-tab="reddit"].on .ico circle:nth-of-type(2),.toggle[data-tab="reddit"].on .ico circle:nth-of-type(3){fill:#fff}.toggle[data-tab="reddit"].on .ico circle:nth-of-type(4){fill:#FF4500}.toggle[data-tab="reddit"].on .ico path{stroke:#FF4500}
@@ -515,6 +516,13 @@ function viewTiktok(d){
   return '<div class="box dim">틱톡 자료 없음</div>';
 }
 function viewGoogle(d){return trendChart(d,'web')}
+function viewPin(d){
+  const w=(d.trends_w||[]).find(t=>t.gprop==='pinterest');
+  if(!w||!Object.keys(w.points).length)return '<div class="box dim">핀터레스트 자료 없음</div>';
+  let weeks=Object.keys(w.points).sort();if(S.range==='1y')weeks=weeks.slice(-53);
+  return chart('pin-w',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 검색 관심도 (미국, 주간)',desc:'지수 0~100',source:'',foot:'',
+    series:[{name:'검색 관심도',color:'#E60023',pts:Object.fromEntries(weeks.map(k=>[k,w.points[k][0]]))}]});
+}
 const KC=['#FFCB05','#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#F48FB1','#B0BEC5'];
 const kcol=id=>KC[Math.max(0,S.sel.indexOf(id))%KC.length];
 function redditPts(d,i){   // 전용 커뮤니티 전체 + 언급 커뮤니티 합계(달별)
@@ -535,16 +543,20 @@ function viewCompare(){
   if(S.tab==='tiktok'){const weeks=[...new Set(ds.flatMap(d=>(d.tiktok_history||[]).map(r=>r.week)))].sort();
     const ser=ds.filter(d=>(d.tiktok_history||[]).length).map(d=>{const h=d.tiktok_history,mx=Math.max(...h.map(r=>r.value))||1;return{name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(h.map(r=>[r.week,Math.round(r.value/mx*1000)/10]))}});
     return ser.length?chart('cmp-tt',{daily:true,months:weeks,cur:null,title:'틱톡 · 주간 추이',desc:'키워드마다 최고=100',source:'TickerTrends',foot:'',series:ser}):'<div class="box dim">틱톡 자료 없음</div>';}
+  if(S.tab==='pin'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='pinterest');const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
+    const ser=ds.filter(d=>pw(d)&&Object.keys(pw(d).points).length).map(d=>({name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(Object.entries(pw(d).points).map(([k,v])=>[k,v[0]]))}));
+    return ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 검색 관심도 (미국, 주간)',desc:'키워드마다 따로 0~100',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>';}
   return '<div class="box dim">요약표는 키워드 하나씩</div>';
 }
 const ICO={
  reddit:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#FF4500"/><ellipse cx="10" cy="11.5" rx="6" ry="4.2" fill="#fff"/><circle cx="7.7" cy="11" r="1" fill="#FF4500"/><circle cx="12.3" cy="11" r="1" fill="#FF4500"/><circle cx="13.6" cy="4.6" r="1.3" fill="#fff"/><path d="M10 7.3 11 4.2 13.6 4.6" stroke="#fff" stroke-width=".9" fill="none"/></svg>',
  yt:'<svg class="ico" viewBox="0 0 20 20"><rect x="0" y="3.5" width="20" height="13" rx="4" fill="#FF0000"/><path d="M8 7v6l5.2-3z" fill="#fff"/></svg>',
  google:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#fff"/><path d="M10 4.2a5.8 5.8 0 1 0 5.6 7.1H10V8.9h8" fill="none" stroke="#4285F4" stroke-width="2.6"/><path d="M4.6 7.6A5.8 5.8 0 0 1 14 5.6" fill="none" stroke="#EA4335" stroke-width="2.6"/><path d="M4.4 12.3a5.8 5.8 0 0 0 1.6 2.3" fill="none" stroke="#FBBC05" stroke-width="2.6"/><path d="M6 14.6a5.8 5.8 0 0 0 8 .6" fill="none" stroke="#34A853" stroke-width="2.6"/></svg>',
+ pin:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#E60023"/><path d="M10.4 3.6c-3.7 0-5.6 2.6-5.6 4.8 0 1.3.5 2.5 1.6 2.9.2.1.3 0 .4-.2l.2-.7c0-.2 0-.3-.1-.4-.3-.4-.5-.9-.5-1.6 0-2.1 1.6-3.9 4.1-3.9 2.2 0 3.5 1.4 3.5 3.2 0 2.4-1.1 4.4-2.6 4.4-.9 0-1.5-.7-1.3-1.6.2-1 .7-2.2.7-2.9 0-.7-.4-1.2-1.1-1.2-.9 0-1.6.9-1.6 2.2 0 .8.3 1.3.3 1.3l-1.1 4.6c-.3 1.4 0 3 0 3.2 0 .1.1.1.2 0 .1-.1 1-1.3 1.4-2.6l.5-2.1c.3.5 1 .9 1.8.9 2.4 0 4-2.2 4-5.1 0-2.2-1.9-4.3-4.7-4.3z" fill="#fff"/></svg>',
  tiktok:'<svg class="ico" viewBox="0 0 20 20"><rect width="20" height="20" rx="5" fill="#000"/><text x="10.8" y="15.2" font-size="13" font-weight="900" text-anchor="middle" fill="#FE2C55">♪</text><text x="9.4" y="14.2" font-size="13" font-weight="900" text-anchor="middle" fill="#25F4EE">♪</text><text x="10" y="14.7" font-size="13" font-weight="900" text-anchor="middle" fill="#fff">♪</text></svg>'};
-const PLAT={reddit:{c:'#FF4500',i:ICO.reddit},yt:{c:'#FF0000',i:ICO.yt},google:{c:'#4285F4',i:ICO.google},tiktok:{c:'#25F4EE',i:ICO.tiktok}};
-const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글']];
-const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,year:yearTable};
+const PLAT={reddit:{c:'#FF4500',i:ICO.reddit},yt:{c:'#FF0000',i:ICO.yt},google:{c:'#4285F4',i:ICO.google},tiktok:{c:'#25F4EE',i:ICO.tiktok},pin:{c:'#E60023',i:ICO.pin}};
+const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글'],['pin',ICO.pin+'핀터레스트']];
+const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,pin:viewPin,year:yearTable};
 function kpis(d){
   const lm=d.months[d.months.length-2],sum=l=>{const v=l.map(s=>s.pts[lm]).filter(v=>v!=null);return v.length?v.reduce((a,b)=>a+b,0):null};
   const k=(cls,label,v)=>`<div class="kpi ${cls}"><span class="kpi-label">${label}</span><strong class="kpi-num">${v}</strong></div>`;
@@ -556,7 +568,7 @@ function kpis(d){
 function render(){
   const d=S.data;
   if(!d){   // 키워드를 고르기 전: 탭과 빈 차트 틀을 보여 줌
-    const T={reddit:'레딧 · 키워드 관련 글 수',yt:'유튜브 · 월별 업로드 영상 수',tiktok:'틱톡 · 주간 조회수',google:'구글 · 검색 관심도'};
+    const T={reddit:'레딧 · 키워드 관련 글 수',yt:'유튜브 · 월별 업로드 영상 수',tiktok:'틱톡 · 주간 조회수',google:'구글 · 검색 관심도',pin:'핀터레스트 · 검색 관심도'};
     const pl=PLAT[S.tab]||PLAT.reddit,Z=SZ(),{W,H,L,R,T:Tp,B,f}=Z;
     let g='';for(let i=0;i<=4;i++){const y=Tp+(H-Tp-B)*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#fff" stroke-opacity="${i===4?.18:.06}"/>`}
     $('#result').innerHTML=`<section class="panel"><div class="filters">${`<div class="toggle-group">${TABS.map(([k,n])=>`<button class="toggle tab ${S.tab===k?'on':''}" data-tab="${k}">${n}</button>`).join('')}</div>`}</div></section>
@@ -597,6 +609,7 @@ async function pollStatus(){
       <span class="pchip">${ICO.reddit}레딧 ${st(!pend(['mention','totals','discover']),pend(['mention','totals','discover'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.yt}유튜브 ${st(!pend(['yt','ytstats']),pend(['yt','ytstats'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.google}구글 ${st(!pend(['trends']),pend(['trends'])?'받는 중':'완료')}</span>
+      <span class="pchip">${ICO.pin}핀터레스트 ${(d.trends_w||[]).some(t=>t.gprop==='pinterest'&&Object.keys(t.points).length)?st(true,'완료'):pend(['pin'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span>
       <span class="pchip">${ICO.tiktok}틱톡 ${tt?st(true,'완료'):'<span class="pst none">자료 없음</span>'}</span></div>`;
     if(done!==lastDone){lastDone=done;await loadData(false)}
   }catch(e){}}
@@ -621,8 +634,8 @@ function savedHtml(){
   const list=f?all.filter(k=>k.name.includes(f)):S.cat==='전체'?all:groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
-  const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수'];
-  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'}};
+  const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수','핀터레스트 검색'];
+  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'},'핀터레스트 검색':{c:'#E60023',i:ICO.pin,t:'검색'}};
   const cell=a=>!a?'<td class="mx-n">·</td>':a.kind==='high'?'<td class="mx-h">신고가</td>':`<td class="mx-p">${a.pct}%</td>`;
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
    <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
