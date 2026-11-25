@@ -43,8 +43,22 @@ def _add(kid, kind, priority, **kw):
     own = "" if kind == "mention" else f" AND keyword_id={int(kid)}"
     if q(f"SELECT 1 FROM jobs WHERE kind=? AND status IN {ACTIVE} AND {where}{own} LIMIT 1", [kind] + vals):
         return
+    if kind in ("yt", "mention", "trends", "discover", "totals") and _is_new(kid):
+        priority -= 10   # 새로 추가한 키워드(24시간 안)는 대기열 맨 앞으로
     x(f"INSERT INTO jobs(keyword_id,kind,priority,{','.join(cols)}) VALUES(?,?,?,?,?,?,?,?,?,?)",
       [kid, kind, priority] + [kw.get(c) for c in cols])
+
+
+def _is_new(kid):
+    r = q("SELECT created_at FROM keywords WHERE id=?", (kid,))
+    if not r or not r[0]["created_at"]:
+        return False
+    try:
+        t = dt.datetime.fromisoformat(r[0]["created_at"])
+        t = t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
+        return dt.datetime.now(dt.timezone.utc) - t < dt.timedelta(hours=24)
+    except ValueError:
+        return False
 
 
 # 구글 트렌드 순서: 모든 키워드의 '구글·미국'을 먼저, 그다음 유튜브·미국, 전세계 순
