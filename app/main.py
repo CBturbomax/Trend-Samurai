@@ -52,6 +52,13 @@ async def lifespan(app):
     # '새 키워드 우선'은 추가 후 6시간까지만 → 지난 키워드의 앞당김은 되돌림(중요도 순서가 먹히게)
     x("UPDATE jobs SET priority=priority+10 WHERE priority<0 AND status IN ('queued','hold') AND keyword_id IN "
       "(SELECT id FROM keywords WHERE created_at < ?)", ((datetime.now(timezone.utc) - __import__('datetime').timedelta(hours=6)).isoformat(),))
+    # 지금 쓰지 않는 검색어의 대기 작업 정리
+    used = set()
+    for k in q("SELECT id FROM keywords"):
+        used.update(worker.reddit_terms(k["id"]))
+    for r in q("SELECT DISTINCT term FROM jobs WHERE kind='mention' AND status!='done' AND term NOT LIKE 'c:%'"):
+        if r["term"] not in used:
+            x("DELETE FROM jobs WHERE kind='mention' AND status!='done' AND term=?", (r["term"],))
     if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done'")
     if not C.AUTO_DISCOVER:

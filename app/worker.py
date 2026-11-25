@@ -72,7 +72,14 @@ def reddit_terms(kid):
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))]
     r = q("SELECT value FROM meta WHERE key=?", (f"rterms:{kid}",))
     extra = json.loads(r[0]["value"]) if r else []
-    return list(dict.fromkeys(extra + terms))
+    out, seen = [], set()
+    for t in dict.fromkeys(extra + terms):   # 띄어쓰기·하이픈만 다른 표기는 하나만(본문 검색이라 중복 요청만 늘어남)
+        n = t.replace(" ", "").replace("-", "").replace("'", "")
+        if n in seen:
+            continue
+        seen.add(n)
+        out.append(t)
+    return out
 
 
 def enqueue_keyword(kid, refresh=False):
