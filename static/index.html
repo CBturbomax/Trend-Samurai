@@ -532,7 +532,7 @@ function exportHtml(){
   const d=S.data,keep=S.tab;let body='';
   body=(d.global&&d.global.enabled?viewGlobal(d):'')+viewOwn(d)+mentionCharts(d)+viewYT(d)+viewTiktok(d)+viewGoogle(d)+yearTable(d);
   const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.keyword)} 리포트</title>
-<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1><p class="dash-sub">Trend Samurai by CB · 레딧 + 검색 관심도 · 기준일 ${d.today} · 변형: ${d.variants.map(esc).join(', ')}</p></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
+<link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
 <footer class="notes"><p>개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 <strong>자체 계산값은 공식 수치가 아닙니다.</strong></p></footer></main></body></html>`;
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=`${d.keyword}-report-${d.today}.html`;a.click();
 }
