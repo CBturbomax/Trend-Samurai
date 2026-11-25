@@ -108,6 +108,12 @@ td.up{color:var(--up)} td.down{color:var(--down)}
   /* 연간 요약표는 폰 한 화면에 들어가게 줄임 */
   .data-table{font-size:10.5px} .data-table th{font-size:10.5px;padding:5px 2px} .data-table td{padding:5px 2px} .h-pc{display:none} .h-mo{display:inline}
 }
+.ico{width:18px;height:18px;vertical-align:-3px;margin-right:6px;flex:none}
+.panel-head h2 .ico{width:22px;height:22px;vertical-align:-4px;margin-right:8px}
+.toggle[data-tab="reddit"].on{background:#FF4500;border-color:#FF4500;color:#fff}
+.toggle[data-tab="yt"].on{background:#FF0000;border-color:#FF0000;color:#fff}
+.toggle[data-tab="google"].on{background:#4285F4;border-color:#4285F4;color:#fff}
+.toggle[data-tab="tiktok"].on{background:#111;border-color:#25F4EE;color:#fff;box-shadow:inset 0 -3px 0 #FE2C55}
 </style>
 </head>
 <body>
@@ -159,6 +165,8 @@ function visMonths(ms){const n=S.range==='1y'?13:S.range==='3y'?37:ms.length;ret
 /* ───── 차트 (손코딩 SVG) ─────
    series: [{name,color,pts:{'2024-01':값|null}}]  o:{title,desc,source,foot,months,cur} */
 function chart(id,o){
+  const pl=PLAT[S.tab];
+  if(pl)o.series.forEach(x=>{if(x.bold||x.isTotal)x.color=pl.c});
   const hid=S.hidden[id]||(S.hidden[id]=new Set(o.defaultHidden||[]));
   // 합산 차트: part 표시된 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
   const parts=o.series.filter(s=>s.part),inc=parts.filter(s=>!hid.has(s.name));
@@ -169,7 +177,7 @@ function chart(id,o){
   const lg=parts.length?`<div class="legend"><span class="dim small" style="align-self:center">합계에 포함 (${inc.length}/${parts.length}) · 눌러서 빼기/넣기:</span>${parts.map(chip).join('')}</div>`
     :o.series.length>1?`<div class="legend">${o.series.map(chip).join('')}</div>`:'';
   const empty=!series.some(s=>months.some(m=>s.pts[m]!=null));
-  return `<section class="panel"><div class="panel-head"><h2>${esc(o.title)}</h2></div><p class="desc">${o.desc}</p>${lg}
+  return `<section class="panel"${pl?` style="border-top:3px solid ${pl.c}"`:''}><div class="panel-head"><h2>${pl?pl.i:''}${esc(o.title)}</h2></div><p class="desc">${o.desc}</p>${lg}
    ${empty?'<div class="box dim">아직 받은 데이터가 없습니다. 수집되는 대로 표시됩니다.</div>':
    `<div class="chart-box"><div class="pc pcwrap">${pcSvg(id,months,series,o)}<div class="tip"></div></div><div class="mo">${moSvg(months,series,o)}</div></div>`}
    <div class="foot"><span>${o.foot||''} ${o.daily?'':'점선 = 진행 중인 달. 흰 테두리 큰 점 = 최신 완료월.'}</span><span class="src">출처: ${esc(o.source)}</span></div></section>`;
@@ -395,7 +403,13 @@ function viewCompare(){
    + chart('cmp-m',{...o,title:'키워드 비교 · 다른 서브레딧 언급 글 수',desc:'단위: 개/월. 키워드마다 고른 서브레딧이 다르면 단순 비교에 주의.',source:'arctic-shift 글 검색',series:mk(d=>mentionBySub(d))})
    + '<div class="box dim small">검색 관심도는 키워드를 따로 요청해서 기준(0~100)이 서로 달라 비교 차트에서 뺐습니다.</div>';
 }
-const TABS=[['reddit','레딧'],['yt','유튜브'],['tiktok','틱톡'],['google','구글'],['year','요약표'],['cmp','키워드 비교']];
+const ICO={
+ reddit:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#FF4500"/><ellipse cx="10" cy="11.5" rx="6" ry="4.2" fill="#fff"/><circle cx="7.7" cy="11" r="1" fill="#FF4500"/><circle cx="12.3" cy="11" r="1" fill="#FF4500"/><circle cx="13.6" cy="4.6" r="1.3" fill="#fff"/><path d="M10 7.3 11 4.2 13.6 4.6" stroke="#fff" stroke-width=".9" fill="none"/></svg>',
+ yt:'<svg class="ico" viewBox="0 0 20 20"><rect x="0" y="3.5" width="20" height="13" rx="4" fill="#FF0000"/><path d="M8 7v6l5.2-3z" fill="#fff"/></svg>',
+ google:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#fff"/><path d="M10 4.2a5.8 5.8 0 1 0 5.6 7.1H10V8.9h8" fill="none" stroke="#4285F4" stroke-width="2.6"/><path d="M4.6 7.6A5.8 5.8 0 0 1 14 5.6" fill="none" stroke="#EA4335" stroke-width="2.6"/><path d="M4.4 12.3a5.8 5.8 0 0 0 1.6 2.3" fill="none" stroke="#FBBC05" stroke-width="2.6"/><path d="M6 14.6a5.8 5.8 0 0 0 8 .6" fill="none" stroke="#34A853" stroke-width="2.6"/></svg>',
+ tiktok:'<svg class="ico" viewBox="0 0 20 20"><rect width="20" height="20" rx="5" fill="#000"/><text x="10.8" y="15.2" font-size="13" font-weight="900" text-anchor="middle" fill="#FE2C55">♪</text><text x="9.4" y="14.2" font-size="13" font-weight="900" text-anchor="middle" fill="#25F4EE">♪</text><text x="10" y="14.7" font-size="13" font-weight="900" text-anchor="middle" fill="#fff">♪</text></svg>'};
+const PLAT={reddit:{c:'#FF4500',i:ICO.reddit},yt:{c:'#FF0000',i:ICO.yt},google:{c:'#4285F4',i:ICO.google},tiktok:{c:'#25F4EE',i:ICO.tiktok}};
+const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글'],['year','요약표'],['cmp','키워드 비교']];
 const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,year:yearTable,cmp:viewCompare};
 function kpis(d){
   const lm=d.months[d.months.length-2],sum=l=>{const v=l.map(s=>s.pts[lm]).filter(v=>v!=null);return v.length?v.reduce((a,b)=>a+b,0):null};
