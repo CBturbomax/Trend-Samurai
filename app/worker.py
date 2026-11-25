@@ -801,7 +801,7 @@ def do_global(job):
     _set(job, "done")
 
 
-HANDLERS = {"pin": do_pin, "tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
+HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
 def do_pin(job):
@@ -831,6 +831,9 @@ def do_pin(job):
     x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"pin_term:{kid}", used, time.time()))
     x("COMMIT")
     _set(job, "done", "")
+
+
+HANDLERS["pin"] = do_pin
 
 
 # 사이트별로 줄을 따로 세워 동시에 처리(같은 사이트 안에서는 여전히 한 번에 하나)
