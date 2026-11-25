@@ -43,6 +43,11 @@ async def lifespan(app):
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")
+    # 글 언급 기준이 바뀌면(제목만 → 제목+본문) 이전 집계를 지우고 다시 셈
+    if (q("SELECT value FROM meta WHERE key='mention_field'") or [{"value": "title"}])[0]["value"] != C.MENTION_FIELD:
+        x("DELETE FROM mention_windows WHERE term NOT LIKE 'c:%'")
+        x("DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status!='done'")
+        x("INSERT OR REPLACE INTO meta VALUES('mention_field',?,?)", (C.MENTION_FIELD, time.time()))
     if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done'")
     if not C.AUTO_DISCOVER:
