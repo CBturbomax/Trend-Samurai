@@ -363,6 +363,23 @@ def trends_import(body: TrendsIn):
     return {"ok": True, "months": len(avg)}
 
 
+@app.post("/api/trends/weekly")
+def trends_weekly_import(body: TrendsIn):
+    """다른 경로(TickerTrends 경유 구글 트렌드 5년 주간)로 받은 주간 값을 그대로 넣음."""
+    r = q("SELECT id FROM keywords WHERE name=?", (body.keyword.strip().lower(),))
+    if not r:
+        raise HTTPException(404, "키워드 없음")
+    kid = r[0]["id"]
+    x("BEGIN")
+    x("DELETE FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=?", (kid, body.gprop, body.geo))
+    for wk, v in body.rows:
+        x("INSERT OR REPLACE INTO trends_w VALUES(?,?,?,?,?,?,?)", (kid, body.gprop, body.geo, str(wk)[:10], float(v), 0, worker.now_iso()))
+    x("UPDATE jobs SET status='done', msg='TickerTrends 경유로 채움' WHERE keyword_id=? AND kind='trends' AND month='W' AND gprop=? AND geo=? AND status!='done'",
+      (kid, body.gprop, body.geo))
+    x("COMMIT")
+    return {"ok": True, "weeks": len(body.rows)}
+
+
 @app.post("/api/settings/youtube")
 def set_youtube_key(body: KeyIn):
     key = body.key.strip()
