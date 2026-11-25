@@ -102,11 +102,12 @@ def enqueue_keyword(kid, refresh=False):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
         if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
             _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
-    # 핀터레스트 주간(미국): 6일 안에 받은 게 없으면 다시
+    # 핀터레스트 주간(나라별, 최근 2년): 6일 안에 받은 게 없으면 다시(미국 먼저)
     wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
-    if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop='pinterest' AND geo='US' AND updated_at>? LIMIT 1", (kid, wk)) \
-            and not q("SELECT 1 FROM meta WHERE key=? AND updated_at>?", (f"pin_none:{kid}", time.time() - 6 * 86400)):
-        _add(kid, "pin", 0, gprop="pinterest", geo="US", month="W")
+    for i, cc in enumerate(PIN_GEOS):
+        if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop='pinterest' AND geo=? AND updated_at>? LIMIT 1", (kid, cc, wk)) \
+                and not q("SELECT 1 FROM meta WHERE key=? AND updated_at>?", (f"pin_none:{kid}:{cc}", time.time() - 86400)):
+            _add(kid, "pin", 0 if cc == "US" else 1, gprop="pinterest", geo=cc, month="W")
     done = {(r["kind"], r["month"]) for r in q(
         "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
     for m in reversed(all_months() if C.PULLPUSH_ENABLED else []):
@@ -804,6 +805,10 @@ def do_global(job):
 HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
+PIN_GEOS = ("US", "GB", "DE", "FR", "IT", "ES")
+PIN_GAP = 15   # 요청 사이 간격(초) — 핀터레스트는 빨리 두드리면 429
+
+
 def do_pin(job):
     kid = job["keyword_id"]
     name = q("SELECT name FROM keywords WHERE id=?", (kid,))[0]["name"]
@@ -815,13 +820,16 @@ def do_pin(job):
             autotune.record("pinterest", True)
         except pinterest.PinError as e:
             autotune.record("pinterest", False)
-            return _set(job, "queued", f"핀터레스트 {e} · 30분 뒤 재시도", time.time() + 1800, job["tries"] + 1)
-        time.sleep(3)
+            wait = 1800 if "429" in str(e) else 600
+            # 막히면 핀터레스트 대기 작업 전체를 쉬게 함(계속 두드리면 더 오래 막힘)
+            x("UPDATE jobs SET next_at=? WHERE kind='pin' AND status='queued' AND next_at<?", (time.time() + wait,) * 2)
+            return _set(job, "queued", f"핀터레스트 {e} · {wait // 60}분 뒤 재시도", time.time() + wait, job["tries"] + 1)
+        time.sleep(PIN_GAP)
         if pts:
             used = t
             break
     if not pts:
-        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"pin_none:{kid}", "1", time.time()))
+        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"pin_none:{kid}:{job['geo']}", "1", time.time()))
         return _set(job, "done", "핀터레스트 자료 없음")
     x("BEGIN")
     x("DELETE FROM trends_w WHERE keyword_id=? AND gprop='pinterest' AND geo=?", (kid, job["geo"]))

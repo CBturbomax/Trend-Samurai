@@ -279,7 +279,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=async(u,o)=>{const r=await fetch(u,o&&{method:o.method||'POST',headers:{'content-type':'application/json'},body:o.body&&JSON.stringify(o.body)});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);return r.json()};
 const PAL=['#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#B0BEC5'], Y='#FFCB05';
-const S={sel:[],geo:'WW',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
+const S={sel:[],geo:'WW',pgeo:'US',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
 const REG={};
 
 /* ───── 숫자·날짜 ───── */
@@ -516,13 +516,25 @@ function viewTiktok(d){
   return '<div class="box dim">틱톡 자료 없음</div>';
 }
 function viewGoogle(d){return trendChart(d,'web')}
+const PGEO=[['US','미국'],['GB','영국'],['DE','독일'],['FR','프랑스'],['IT','이탈리아'],['ES','스페인']],PGN=Object.fromEntries(PGEO);
+const PGC={US:'#2F6FED',GB:'#D9534F',DE:'#17A2B8',FR:'#C99A2E',IT:'#8E44AD',ES:'#E83E8C'};
+const pinW=(d,c)=>{const w=(d.trends_w||[]).find(t=>t.gprop==='pinterest'&&t.geo===c);return w&&Object.keys(w.points).length?w.points:null};
+const pinSel=()=>`<div class="filters">${`<div class="toggle-group">${PGEO.map(([k,n])=>`<button class="toggle pgeo ${S.pgeo===k?'on':''}" data-pg="${k}">${n}</button>`).join('')}</div>`}</div>`;
 function viewPin(d){
-  const w=(d.trends_w||[]).find(t=>t.gprop==='pinterest');
-  if(!w||!Object.keys(w.points).length)return '<div class="box dim">핀터레스트 자료 없음</div>';
-  let weeks=Object.keys(w.points).sort();if(S.range==='1y')weeks=weeks.slice(-53);
-  return chart('pin-w',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 검색 관심도 (미국, 주간)',desc:'지수 0~100',source:'',foot:'',
-    series:[{name:'검색 관심도',color:'#E60023',pts:Object.fromEntries(weeks.map(k=>[k,w.points[k][0]]))}]});
+  const p=pinW(d,S.pgeo);
+  const cut=ws=>S.range==='1y'?ws.slice(-53):ws;
+  let out=pinSel();
+  if(!p)out+=`<div class="box dim">핀터레스트 자료 없음 (${PGN[S.pgeo]})</div>`;
+  else{const weeks=cut(Object.keys(p).sort());
+    out+=chart('pin-w-'+S.pgeo,{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'지수 0~100',source:'',foot:'',
+      series:[{name:'검색 관심도',color:'#E60023',pts:Object.fromEntries(weeks.map(k=>[k,p[k][0]]))}]});}
+  const have=PGEO.filter(([c])=>pinW(d,c));
+  if(have.length>1){const weeks=cut([...new Set(have.flatMap(([c])=>Object.keys(pinW(d,c))))].sort());
+    out+=chart('pin-geo',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 나라별 (주간)',desc:'나라마다 따로 0~100 · 모양만 비교',source:'',foot:'',
+      series:have.map(([c,n])=>({name:n,color:PGC[c],pts:Object.fromEntries(Object.entries(pinW(d,c)).map(([k,v])=>[k,v[0]]))}))});}
+  return out;
 }
+
 const KC=['#FFCB05','#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#F48FB1','#B0BEC5'];
 const kcol=id=>KC[Math.max(0,S.sel.indexOf(id))%KC.length];
 function redditPts(d,i){   // 전용 커뮤니티 전체 + 언급 커뮤니티 합계(달별)
@@ -543,9 +555,9 @@ function viewCompare(){
   if(S.tab==='tiktok'){const weeks=[...new Set(ds.flatMap(d=>(d.tiktok_history||[]).map(r=>r.week)))].sort();
     const ser=ds.filter(d=>(d.tiktok_history||[]).length).map(d=>{const h=d.tiktok_history,mx=Math.max(...h.map(r=>r.value))||1;return{name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(h.map(r=>[r.week,Math.round(r.value/mx*1000)/10]))}});
     return ser.length?chart('cmp-tt',{daily:true,months:weeks,cur:null,title:'틱톡 · 주간 추이',desc:'키워드마다 최고=100',source:'TickerTrends',foot:'',series:ser}):'<div class="box dim">틱톡 자료 없음</div>';}
-  if(S.tab==='pin'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='pinterest');const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
+  if(S.tab==='pin'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='pinterest'&&t.geo===S.pgeo);const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
     const ser=ds.filter(d=>pw(d)&&Object.keys(pw(d).points).length).map(d=>({name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(Object.entries(pw(d).points).map(([k,v])=>[k,v[0]]))}));
-    return ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 검색 관심도 (미국, 주간)',desc:'키워드마다 따로 0~100',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>';}
+    return pinSel()+(ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'키워드마다 따로 0~100',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>');}
   return '<div class="box dim">요약표는 키워드 하나씩</div>';
 }
 const ICO={
@@ -692,6 +704,7 @@ document.addEventListener('click',async e=>{
   else if(t.classList.contains('rng')){S.range=t.dataset.r;render()}
   else if(t.classList.contains('unit')){S.unit=t.dataset.u;render()}
   else if(t.classList.contains('geo')){S.geo=t.dataset.g;render()}
+  else if(t.classList.contains('pgeo')){S.pgeo=t.dataset.pg;render()}
   else if(t.id==='btnLabels'){S.allLabels=!S.allLabels;render()}
   else if(t.closest('.lg')){const b=t.closest('.lg'),h=S.hidden[b.dataset.chart];h.has(b.dataset.s)?h.delete(b.dataset.s):h.add(b.dataset.s);render()}
   else if(t.id==='btnAddSubs'){const subs=[...vals('.candck'),...split($('#addSubs').value)];if(subs.length){await api(`/api/keywords/${S.kid}/mention_subs`,{body:{subs}});loadData()}}

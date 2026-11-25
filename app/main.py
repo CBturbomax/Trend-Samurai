@@ -79,6 +79,8 @@ async def lifespan(app):
     x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status='queued' AND tries=0")
     if not C.MENTION_MULTIYEAR:   # 여러 해짜리 대기분은 지우고 해 단위로 다시
         x("DELETE FROM jobs WHERE kind='mention' AND status IN ('queued','hold') AND julianday(end)-julianday(start)>400")   # 해마다 나뉜 댓글 대기분도 합쳐서 다시
+    x("DELETE FROM meta WHERE key LIKE 'pin_none:%' AND key NOT LIKE 'pin_none:%:%'")
+    x("DELETE FROM jobs WHERE kind='pin' AND status='done' AND msg LIKE '%자료 없음%'")
     for k in q("SELECT id FROM keywords"):   # 새로 생긴 수집 항목이 있으면 기존 키워드에도 채움
         worker.enqueue_keyword(k["id"])
     worker.start()
@@ -578,7 +580,7 @@ def build(kid: int):
         "own": own, "mentions": mentions, "trends": trends,
         "trends_w": [{"gprop": g, "geo": geo, "points": {r["week"]: [r["value"], r["partial"]] for r in q(
             "SELECT week,value,partial FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? ORDER BY week", (kid, g, geo))}}
-            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("pinterest", "US"))],
+            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), *(("pinterest", c) for c in worker.PIN_GEOS))],
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
             "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
@@ -623,7 +625,7 @@ def keyword_alerts(d):
                 for m, (v, _p) in t["points"].items():
                     s[m] = s.get(m, 0) + v
         out.append(_highs(label, s, cur))
-    pw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "pinterest" and t["points"]), None)
+    pw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "pinterest" and t["geo"] == "US" and t["points"]), None)
     if pw:   # 핀터레스트 주간(미국, 최근 2년): 마지막 주가 지난 최고를 넘었나
         out.append(_highs("핀터레스트 검색", {k: v[0] for k, v in sorted(pw.items())}, None, 26))
     # 유튜브 영상 수는 아직 달마다 받은 깊이(1차 3페이지/2차 8페이지)가 달라 최근 달이 높게 나옴 → 2차가 끝날 때까지 알림에서 제외
