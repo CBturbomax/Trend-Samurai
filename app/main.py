@@ -556,7 +556,7 @@ def keyword_alerts(d):
                 for m, (v, _p) in t["points"].items():
                     s[m] = s.get(m, 0) + v
         out.append(_highs(label, s, cur))
-    out.append(_highs("유튜브 영상 수", {m: v[0] for m, v in (d["youtube"].get("months") or {}).items()}, cur))
+    # 유튜브 영상 수는 아직 달마다 받은 깊이(1차 3페이지/2차 8페이지)가 달라 최근 달이 높게 나옴 → 2차가 끝날 때까지 알림에서 제외
     rp = {}
     for ms in d["own"].values():
         for m, v in ms.items():
