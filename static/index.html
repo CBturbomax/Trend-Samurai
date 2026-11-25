@@ -160,6 +160,20 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .foot{font-size:11px;color:#6b7783}
 @media(max-width:640px){.toggle{padding:6px 11px;font-size:13px}.btn{padding:6px 11px;font-size:12px}.actions{margin-left:0}.chd-v{font-size:24px}.chart-box{padding:6px 2px 2px}}
 .lg.pend{opacity:.45;border-style:dashed}
+.kw-search{flex:0 1 220px;min-width:150px}
+.kcats{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:4px 0 12px}
+.kcat{padding:9px 14px;font-size:13px;font-weight:700;color:#8b96a2;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.kcat span{margin-left:6px;font-size:11px;color:#5f6b77;font-weight:600}
+.kcat b{color:var(--yellow);margin-left:4px}
+.kcat:hover{color:#e8edf2}.kcat.on{color:#fff;border-bottom-color:var(--yellow)}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px}
+.kcell{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--line);font-size:13px;font-weight:700;color:#e8edf2;text-align:left;cursor:pointer}
+.kcell:hover{border-color:#5b6672}
+.kcell em{font-style:normal;font-size:11px;color:#5f6b77;min-width:16px;font-variant-numeric:tabular-nums}
+.kcell span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kcell small{font-size:11px;color:#7d8996;font-variant-numeric:tabular-nums}
+.kcell.on{border-width:2px;padding:7px 9px;background:rgba(255,255,255,.04)}
+@media(max-width:640px){.kgrid{grid-template-columns:repeat(2,1fr)}.kcat{padding:8px 10px}}
 </style>
 </head>
 <body>
@@ -508,12 +522,18 @@ const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorag
 S.groupBy=ls('kt_group')||'category';S.sortBy=ls('kt_sort')||'score';S.kwq='';S.ks=[];
 function savedHtml(){
   const key=S.groupBy,order=key==='category'?CATS:CTRS,f=S.kwq.trim().toLowerCase();
-  const ks=S.ks.filter(k=>!f||k.name.includes(f)).sort((a,b)=>S.sortBy==='rank'?a.rank-b.rank:b.score-a.score);
-  const groups={};ks.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
+  const all=[...S.ks].sort((a,b)=>S.sortBy==='rank'?a.rank-b.rank:b.score-a.score);
+  const groups={};all.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
   const names=[...order.filter(g=>groups[g]),...Object.keys(groups).filter(g=>!order.includes(g))];
-  const tg=`<div class="toggle-group">${[['category','카테고리별'],['country','국가별']].map(([k,n])=>`<button class="toggle grpby ${S.groupBy===k?'on':''}" data-g="${k}">${n}</button>`).join('')}</div><div class="toggle-group">${[['score','인기순'],['rank','중요도순']].map(([k,n])=>`<button class="toggle sortby ${S.sortBy===k?'on':''}" data-o="${k}">${n}</button>`).join('')}</div>`;
-  return `<div class="filters">${tg}<label class="search-box" style="flex:0 1 220px;min-width:160px"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
-   <div class="kgroups">${names.map(g=>`<div class="kgroup"><div class="kg-title">${esc(g)}</div><div class="kg-items">${groups[g].map(k=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';return `<button class="kchip kwbtn ${on?'on':''}" title="인기 ${k.score} · 유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''}>${esc(k.name)}</button>`}).join('')}</div></div>`).join('')||'<span class="dim">없음</span>'}</div>`;
+  if(!S.cat||!groups[S.cat]){const cur=S.ks.find(k=>k.id===S.kid);S.cat=(cur&&(cur[key]||'미분류'))||names[0]}
+  const seg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
+  const list=f?all.filter(k=>k.name.includes(f)):groups[S.cat]||[];
+  const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
+  return `<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
+     <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
+   ${f?'':`<div class="kcats">${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
+   <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
+     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''} title="유튜브 조회 ${fmtS(k.m.yt_views)} · 영상 ${k.m.yt_videos} · 레딧 글 ${k.m.reddit_posts} (최근 12개월)"><em>${i+1}</em><span>${esc(k.name)}</span><small>${S.sortBy==='score'?k.score:''}</small></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadSaved(){
@@ -550,6 +570,7 @@ const vals=sel=>[...document.querySelectorAll(sel+':checked')].map(x=>x.value);
 document.addEventListener('click',async e=>{
   const t=e.target;
   if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='reddit';select(r.id)}
+  else if(t.closest('.kcat')){S.cat=t.closest('.kcat').dataset.cat;renderSaved()}
   else if(t.classList.contains('sortby')){S.sortBy=t.dataset.o;ls('kt_sort',S.sortBy);renderSaved()}
   else if(t.classList.contains('kwbtn'))select(+t.dataset.id);
   else if(t.classList.contains('grpby')){S.groupBy=t.dataset.g;ls('kt_group',S.groupBy);renderSaved()}
