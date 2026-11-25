@@ -625,11 +625,12 @@ def alerts():
 
 
 def refresh_rank():
-    """수집 순서: 신고가가 있는 키워드 → 근접 → 나머지, 각각 인기 점수 높은 순."""
+    """수집 순서: 점수 50 초과 키워드 먼저(그 안에서 신고가 → 근접 → 점수 순), 그다음 나머지."""
     try:
         ks = keywords()
         al = {r["id"]: r for r in alerts()}
-        ks.sort(key=lambda k: (-(al.get(k["id"], {}).get("highs", 0) > 0), -(k["id"] in al), -k["score"]))
+        # 점수 50 초과 키워드 먼저(그 안에서 신고가 → 근접 → 점수 순), 그다음 나머지
+        ks.sort(key=lambda k: (k["score"] <= 50, -(al.get(k["id"], {}).get("highs", 0) > 0), -(k["id"] in al), -k["score"]))
         x("BEGIN")
         x("DELETE FROM krank")
         for i, k in enumerate(ks):
