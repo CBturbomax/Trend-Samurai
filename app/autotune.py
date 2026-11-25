@@ -81,7 +81,7 @@ def tune():
     n, ok = _since("youtube", t0)
     if n >= 8:   # 간격이 길면 5분에 20번도 못 하므로 '전부 성공'이 아니라 비율로 판단
         r = ok / n
-        if r < 0.8 and GAPS["youtube"] >= BOUNDS["youtube"][1]:   # 간격을 최대로 늘려도 막힘 → 45분 쉬고 재개(제한이 풀리길 기다림)
+        if False and r < 0.8 and GAPS["youtube"] >= BOUNDS["youtube"][1]:   # 쉬기는 효과 없음(쉬고 나서도 성공률 그대로, 실측) → 끔   # 간격을 최대로 늘려도 막힘 → 45분 쉬고 재개(제한이 풀리길 기다림)
             PAUSE["youtube"] = time.time() + 2700
             note(f"유튜브 45분 쉬기 (최대 간격에서도 성공 {r:.0%})")
             _set_gap("youtube", 3.0, "쉬고 난 뒤 다시 시작")
