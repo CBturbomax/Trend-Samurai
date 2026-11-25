@@ -188,7 +188,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=async(u,o)=>{const r=await fetch(u,o&&{method:o.method||'POST',headers:{'content-type':'application/json'},body:o.body&&JSON.stringify(o.body)});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);return r.json()};
 const PAL=['#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#B0BEC5'], Y='#FFCB05';
-const S={sel:[],geo:'US',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
+const S={sel:[],geo:'WW',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
 const REG={};
 
 /* ───── 숫자·날짜 ───── */
@@ -464,7 +464,7 @@ function render(){
     const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
     $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
       <div class="filters">${tg2(TABS.filter(t=>t[0]!=='year'),'tab',S.tab,'tab')}</div>
-      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
+      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['WW','전세계'],['US','미국']],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
     return}
   $('#kpis').innerHTML=kpis(d);
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
@@ -473,7 +473,7 @@ function render(){
    <select class="gsel" id="gCtr"><option value="">미분류</option>${CTRS.map(c=>`<option ${d.country===c?'selected':''}>${c}</option>`).join('')}</select></span></div>
    <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
    <div class="filters">${tg([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}
-   ${['yt','google','year'].includes(S.tab)?tg([['US','미국'],['WW','전세계']],'geo',S.geo,'g'):''}
+   ${['yt','google','year'].includes(S.tab)?tg([['WW','전세계'],['US','미국']],'geo',S.geo,'g'):''}
    <div class="actions"><button class="btn" id="btnRefresh">갱신</button>${d.full?'':'<button class="btn" id="btnFull">과거 데이터 받기</button>'}<button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">리포트</button><button class="btn warn" id="btnDel">삭제</button></div></div></section>`+VIEW[S.tab](d);
 }
 
