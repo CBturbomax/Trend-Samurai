@@ -403,10 +403,8 @@ def set_youtube_key(body: KeyIn):
 
 
 PROBES = {   # 다른 수집 경로가 서버에서 되는지 한 번씩 확인(고정 주소만)
-    "reddit_json": "https://www.reddit.com/r/AsianBeauty/search.json?q=medicube&restrict_sr=1&sort=new&limit=5",
-    "reddit_old": "https://old.reddit.com/r/AsianBeauty/search.json?q=medicube&restrict_sr=1&sort=new&limit=5",
-    "reddit_site": "https://www.reddit.com/search.json?q=medicube&sort=new&limit=5",
-    "yt_rss": "https://www.youtube.com/feeds/videos.xml?channel_id=UC_x5XG1OV2P6uZZ5FSM9Ttw",
+    "pin_metrics": "https://trends.pinterest.com/metrics/?terms=rhode&country=US&end_date=2026-11-23&days=730&aggregation=2&normalize_against_group=true&predicted_days=0",
+    "pin_page": "https://trends.pinterest.com/search/?q=rhode&country=US",
 }
 
 
@@ -417,7 +415,7 @@ def probe():
     for k, u in PROBES.items():
         try:
             r = rq.get(u, headers={"User-Agent": "TrendSamurai/1.0 (personal research dashboard)"}, timeout=20)
-            out[k] = [r.status_code, r.text[:160]]
+            out[k] = [r.status_code, r.text[:400], r.headers.get("content-type")]
         except Exception as e:
             out[k] = [0, type(e).__name__]
     return out
