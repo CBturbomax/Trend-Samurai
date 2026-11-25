@@ -388,6 +388,13 @@ function trendSeries(d,gprop,geo){
   return l}
 const trendMain=(d,gprop,geo)=>{const l=trendSeries(d,gprop,geo);return l.find(s=>s.isSum)||l[0]};
 function trendChart(d,gprop){
+  const w=(d.trends_w||[]).find(t=>t.gprop===gprop&&t.geo===S.geo);
+  if(w&&Object.keys(w.points).length){   // 주간 값이 있으면 주간으로
+    let weeks=Object.keys(w.points).sort();const n=S.range==='1y'?53:S.range==='3y'?157:weeks.length;weeks=weeks.slice(-n);
+    const cur=weeks.find(k=>w.points[k][1])||null;
+    return chart(`trendw-${gprop}-${S.geo}`,{daily:true,months:weeks,cur,title:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]}, 주간)`,desc:'지수 0~100',
+      series:[{name:'검색 관심도',color:PAL[0],pts:Object.fromEntries(weeks.map(k=>[k,w.points[k][0]]))}],source:''});
+  }
   return chart(`trend-${gprop}-${S.geo}`,{months:d.months,cur:d.cur_month,title:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]})`,
     desc:'지수 0~100',
     series:trendSeries(d,gprop,S.geo),source:'Google Trends (비공식)',foot:''});

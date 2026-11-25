@@ -98,6 +98,10 @@ def enqueue_keyword(kid, refresh=False):
         g, r = gprop or "web", geo or "WW"
         if not q("SELECT 1 FROM trends WHERE batch=? AND updated_at>? LIMIT 1", (f"{kid}:{g}:{r}", fresh)):
             _add(kid, "trends", TREND_PRIO[(g, r)], gprop=g, geo=r)
+        # 주간 값: 6일 안에 받은 게 없으면 다시(전세계 먼저)
+        wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
+        if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
+            _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
     done = {(r["kind"], r["month"]) for r in q(
         "SELECT kind, month FROM global_months WHERE keyword_id=? AND status='done'", (kid,))}
     for m in reversed(all_months() if C.PULLPUSH_ENABLED else []):
@@ -408,8 +412,9 @@ def do_trends(job):
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))][:5]
     gprop = "" if job["gprop"] == "web" else job["gprop"]
     geo = "" if job["geo"] == "WW" else job["geo"]
+    weekly = job.get("month") == "W"
     try:
-        data = trends.fetch(terms, gprop, geo, C.START_DATE, today().isoformat())
+        data = trends.fetch_weekly(terms, gprop, geo) if weekly else trends.fetch(terms, gprop, geo, C.START_DATE, today().isoformat())
     except trends.TrendsBlocked as e:
         autotune.record("trends", False)
         # 구글이 429로 막으면 계속 두드릴수록 오래 막힘 → 트렌드 작업 전체를 30분, 1시간, 2시간… 뒤로 미룸
@@ -417,6 +422,22 @@ def do_trends(job):
         wait = 2400 if t < 3 else 5400   # 막히면 40분(계속이면 90분) 쉬고 재개 — 너무 길게 쉬면 400건이 안 끝남
         x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status IN ('queued','hold')", (time.time() + wait,))
         return _set(job, "queued", f"구글이 요청 과다(429)로 잠시 막음 · {int(wait/60)}분 뒤 재시도 ({t}회째)", time.time() + wait, t)
+    if weekly:   # 주간: 표기별 값을 합쳐 키워드 하나의 주간 선으로 저장
+        tot = {}
+        for term, pts in data.items():
+            for w, v, partial in pts:
+                a = tot.setdefault(w, [0.0, 0])
+                a[0] += v
+                a[1] = max(a[1], int(partial))
+        x("BEGIN")
+        x("DELETE FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=?", (kid, job["gprop"], job["geo"]))
+        for w, (v, p_) in tot.items():
+            x("INSERT INTO trends_w VALUES(?,?,?,?,?,?,?)", (kid, job["gprop"], job["geo"], w, v, p_, now_iso()))
+        x("COMMIT")
+        _set(job, "done", "" if tot else "데이터 없음(검색량 부족)")
+        x("UPDATE jobs SET next_at=? WHERE kind='trends' AND status='queued' AND next_at<?", (time.time() + autotune.gap("trends"),) * 2)
+        autotune.record("trends", True)
+        return
     batch = f"{kid}:{job['gprop']}:{job['geo']}"
     x("BEGIN")
     x("DELETE FROM trends WHERE batch=?", (batch,))

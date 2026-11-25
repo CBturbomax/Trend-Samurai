@@ -542,6 +542,9 @@ def build(kid: int):
         "id": kid, "keyword": k[0]["name"], "category": k[0]["category"], "country": k[0]["country"], "variants": terms, "months": months,
         "cur_month": months[-1], "days_elapsed": t.day, "today": t.isoformat(),
         "own": own, "mentions": mentions, "trends": trends,
+        "trends_w": [{"gprop": g, "geo": geo, "points": {r["week"]: [r["value"], r["partial"]] for r in q(
+            "SELECT week,value,partial FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? ORDER BY week", (kid, g, geo))}}
+            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"))],
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
             "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
@@ -574,6 +577,12 @@ def keyword_alerts(d):
     cur = d["cur_month"]
     out = []
     for gp, label in (("web", "구글 검색"), ("youtube", "유튜브 검색")):
+        w = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == gp and t["geo"] == "WW" and t["points"]), None)
+        if w:   # 주간: 마지막 완료 주가 최근 2년(104주) 최고를 넘었나
+            done = {k: v[0] for k, v in sorted(w.items()) if not v[1]}
+            ks_ = sorted(done)[-104:]
+            out.append(_highs(label, {k: done[k] for k in ks_}, None, 26))
+            continue
         s = {}
         for t in d["trends"]:
             if t["gprop"] == gp and t["geo"] == "WW":

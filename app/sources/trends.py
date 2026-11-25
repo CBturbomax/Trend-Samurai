@@ -20,7 +20,7 @@ class TrendsBlocked(Exception):
 _session = {"p": None, "uses": 0}
 
 
-def _pytrends(terms, gprop, geo, start, end):
+def _pytrends(terms, gprop, geo, start, end, timeframe=None, fmt="%Y-%m"):
     """세션(쿠키)을 재사용해 요청 수를 줄임: 매번 새로 만들면 쿠키 받기 요청이 한 번 더 나감."""
     warnings.simplefilter("ignore")
     from pytrends.request import TrendReq
@@ -29,7 +29,7 @@ def _pytrends(terms, gprop, geo, start, end):
             _session["p"], _session["uses"] = TrendReq(hl="en-US", tz=0, timeout=(10, 30)), 0
         p = _session["p"]
         _session["uses"] += 1
-        p.build_payload(terms, timeframe=f"{start} {end}", geo=geo, gprop=gprop)
+        p.build_payload(terms, timeframe=timeframe or f"{start} {end}", geo=geo, gprop=gprop)
         df = p.interest_over_time()
     except Exception as e:  # pytrends는 429 등을 여러 예외로 던짐
         _session["p"] = None   # 막혔으면 다음엔 새 세션으로
@@ -39,7 +39,7 @@ def _pytrends(terms, gprop, geo, start, end):
         return out
     for ts, row in df.iterrows():
         for t in terms:
-            out[t].append((ts.strftime("%Y-%m"), float(row[t]), bool(row.get("isPartial", False))))
+            out[t].append((ts.strftime(fmt), float(row[t]), bool(row.get("isPartial", False))))
     return out
 
 
@@ -72,3 +72,8 @@ def _serpapi(terms, gprop, geo, start, end):
 def fetch(terms, gprop, geo, start, end):
     fn = _serpapi if TRENDS_PROVIDER == "serpapi" else _pytrends
     return fn(terms[:5], gprop, geo, start, end)
+
+
+def fetch_weekly(terms, gprop, geo):
+    """최근 5년 주간 값(구글이 5년 범위면 주 단위로 줌). → {term: [('YYYY-MM-DD', 값, 진행중)]}"""
+    return _pytrends(terms[:5], gprop, geo, None, None, timeframe="today 5-y", fmt="%Y-%m-%d")
