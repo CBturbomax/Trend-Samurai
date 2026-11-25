@@ -371,6 +371,18 @@ def trends_import(body: TrendsIn):
     return {"ok": True, "months": len(avg)}
 
 
+class JaIn(BaseModel):
+    term: str   # 일본어 검색어(예: くら寿司)
+    ko: str     # 한글 뜻·읽기(예: 쿠라 스시)
+
+
+@app.post("/api/keywords/{kid}/ja")
+def set_ja(kid: int, body: JaIn):
+    """일본 브랜드: 일본어 검색어와 그 한글 뜻(화면에 괄호로 보여 줌)."""
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"ja:{kid}", json.dumps({"term": body.term, "ko": body.ko}, ensure_ascii=False), time.time()))
+    return {"ok": True}
+
+
 @app.post("/api/trends/weekly")
 def trends_weekly_import(body: TrendsIn):
     """다른 경로(TickerTrends 경유 구글 트렌드 5년 주간)로 받은 주간 값을 그대로 넣음."""
@@ -578,9 +590,10 @@ def build(kid: int):
         "id": kid, "keyword": k[0]["name"], "category": k[0]["category"], "country": k[0]["country"], "variants": terms, "months": months,
         "cur_month": months[-1], "days_elapsed": t.day, "today": t.isoformat(),
         "own": own, "mentions": mentions, "trends": trends,
+        "ja": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ja:{kid}",)) or [{"value": "null"}])[0]["value"]),
         "trends_w": [{"gprop": g, "geo": geo, "points": {r["week"]: [r["value"], r["partial"]] for r in q(
             "SELECT week,value,partial FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? ORDER BY week", (kid, g, geo))}}
-            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), *(("pinterest", c) for c in worker.PIN_GEOS))],
+            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("web", "JA"), *(("pinterest", c) for c in worker.PIN_GEOS))],
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
             "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
