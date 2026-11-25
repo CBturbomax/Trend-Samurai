@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS jobs(
   status TEXT DEFAULT 'queued',                      -- queued | running | done | hold | failed
   tries INTEGER DEFAULT 0, next_at REAL DEFAULT 0, msg TEXT DEFAULT '',
   priority INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS krank(keyword_id INTEGER PRIMARY KEY, rank INTEGER);   -- 수집 순서용 키워드 순위(인기·신고가)
 CREATE INDEX IF NOT EXISTS jobs_pick ON jobs(status, priority, month);
 """
 

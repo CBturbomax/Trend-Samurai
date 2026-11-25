@@ -6,6 +6,7 @@ import io
 import json
 import os
 import secrets
+import threading
 import time
 from contextlib import asynccontextmanager
 
@@ -67,6 +68,8 @@ async def lifespan(app):
     worker.start()
     sched = BackgroundScheduler()
     sched.add_job(worker.daily_refresh, "cron", hour=C.DAILY_HOUR, minute=10)
+    sched.add_job(refresh_rank, "interval", hours=1)
+    threading.Thread(target=refresh_rank, daemon=True).start()
     sched.start()
     yield
     sched.shutdown(wait=False)
@@ -594,6 +597,21 @@ def alerts():
     res.sort(key=lambda r: (-r["highs"], -len(r["alerts"]), r["keyword"]))
     _ALERT.update(t=time.time(), v=res)
     return res
+
+
+def refresh_rank():
+    """수집 순서: 신고가가 있는 키워드 → 근접 → 나머지, 각각 인기 점수 높은 순."""
+    try:
+        ks = keywords()
+        al = {r["id"]: r for r in alerts()}
+        ks.sort(key=lambda k: (-(al.get(k["id"], {}).get("highs", 0) > 0), -(k["id"] in al), -k["score"]))
+        x("BEGIN")
+        x("DELETE FROM krank")
+        for i, k in enumerate(ks):
+            x("INSERT INTO krank VALUES(?,?)", (k["id"], i))
+        x("COMMIT")
+    except Exception:
+        pass
 
 
 @app.get("/api/keywords/{kid}/data")

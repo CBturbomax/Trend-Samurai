@@ -792,11 +792,13 @@ def _next(kinds=None):
         # 레딧: 커뮤니티 고르기(discover)와 언급 수 세기(mention)를 번갈아 → 한쪽만 계속 돌지 않게
         state["rturn"] = state.get("rturn", 0) + 1
         if state["rturn"] % 2 == 0:
-            r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='mention' "
-                  "ORDER BY priority, tries, month DESC, id LIMIT 1", (now,))   # 계속 실패하는 무거운 작업보다 새 작업 먼저
+            r = q("SELECT j.* FROM jobs j LEFT JOIN krank k ON k.keyword_id=j.keyword_id "
+                  "WHERE j.status='queued' AND j.next_at<=? AND j.kind='mention' "
+                  "ORDER BY j.priority, IFNULL(k.rank,9999), j.tries, j.month DESC, j.id LIMIT 1", (now,))   # 중요한(인기·신고가) 키워드부터
     if not r:
-        r = q(f"SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind IN ({ks}) "
-              "ORDER BY priority, month DESC, id LIMIT 1", (now, *kinds))
+        r = q(f"SELECT j.* FROM jobs j LEFT JOIN krank k ON k.keyword_id=j.keyword_id "
+              f"WHERE j.status='queued' AND j.next_at<=? AND j.kind IN ({ks}) "
+              "ORDER BY j.priority, IFNULL(k.rank,9999), j.month DESC, j.id LIMIT 1", (now, *kinds))
     if not r:
         r = q(f"SELECT * FROM jobs WHERE status='hold' AND next_at<=? AND kind IN ({ks}) "
               "ORDER BY next_at, id LIMIT 1", (now, *kinds))
