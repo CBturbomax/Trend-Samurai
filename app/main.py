@@ -227,15 +227,42 @@ def refresh(kid: int):
 
 @app.get("/api/keywords")
 def keywords():
-    # 중요도 순: 최근 12개월에 올라온 유튜브 영상의 조회수 합(키워드끼리 바로 비교되는 절대값)
-    since = (worker.today().replace(day=1) - __import__("datetime").timedelta(days=365)).isoformat()
-    score = {r["keyword_id"]: r["v"] for r in q(
-        "SELECT keyword_id, SUM(views) v FROM yt_videos WHERE published>=? GROUP BY keyword_id", (since,))}
-    rows = [dict(r) | {"score": score.get(r["id"], 0) or 0} for r in q("SELECT id,name,category,country FROM keywords")]
+    """목록 + 인기 점수. 키워드끼리 바로 비교되는 절대값만 씀(최근 12개월):
+    유튜브 영상 조회수 합, 유튜브 영상 수, 레딧 글 수(전용 커뮤니티 전체 + 다른 커뮤니티 언급).
+    지표마다 키워드 사이 백분위(0~100)를 매기고 평균 → 인기 점수. 구글·틱톡은 키워드마다 따로 정규화된 값이라 제외."""
+    import datetime as _dt
+    since_d = worker.today().replace(day=1) - _dt.timedelta(days=365)
+    since, since_m = since_d.isoformat(), since_d.isoformat()[:7]
+    ks = [dict(r) for r in q("SELECT id,name,category,country FROM keywords")]
+    ytv = {r["keyword_id"]: (r["v"] or 0, r["n"]) for r in q(
+        "SELECT keyword_id, SUM(views) v, COUNT(*) n FROM yt_videos WHERE published>=? GROUP BY keyword_id", (since,))}
+    for k in ks:
+        kid = k["id"]
+        subs = q("SELECT name,kind FROM subreddits WHERE keyword_id=?", (kid,))
+        own = [x["name"] for x in subs if x["kind"] == "own"]
+        men = [x["name"] for x in subs if x["kind"] == "mention"]
+        rp = 0
+        if own:
+            rp += q(f"SELECT IFNULL(SUM(posts),0) v FROM sub_monthly WHERE month>=? AND sub IN ({','.join('?'*len(own))})", (since_m, *own))[0]["v"]
+        terms = [t for t in worker.reddit_terms(kid)]
+        if men and terms:
+            rp += q(f"SELECT IFNULL(SUM(count),0) v FROM mention_windows WHERE start>=? AND status!='split' "
+                    f"AND sub IN ({','.join('?'*len(men))}) AND term IN ({','.join('?'*len(terms))})", (since, *men, *terms))[0]["v"]
+        v, n = ytv.get(kid, (0, 0))
+        k["m"] = {"yt_views": v, "yt_videos": n, "reddit_posts": rp}
+    for key in ("yt_views", "yt_videos", "reddit_posts"):
+        vals = sorted(k["m"][key] for k in ks)
+        for k in ks:   # 백분위: 나보다 작은 키워드 비율
+            k["m"][key + "_pct"] = round(100 * sum(1 for x in vals if x < k["m"][key]) / max(1, len(vals) - 1))
+    for k in ks:
+        m = k["m"]
+        k["score"] = round((m["yt_views_pct"] + m["yt_videos_pct"] + m["reddit_posts_pct"]) / 3)
     f = C.ROOT / "seed" / "importance.txt"
     order = [l.strip().lower() for l in f.read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")] if f.exists() else []
     rank = {n: i for i, n in enumerate(order)}
-    return sorted(rows, key=lambda r: (rank.get(r["name"], 10 ** 6), -r["score"], r["name"]))
+    for k in ks:
+        k["rank"] = rank.get(k["name"], 10 ** 6)
+    return sorted(ks, key=lambda r: (-r["score"], r["name"]))
 
 
 class GroupIn(BaseModel):
