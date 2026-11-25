@@ -229,6 +229,17 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .kgrid::-webkit-scrollbar{width:8px}.kgrid::-webkit-scrollbar-thumb{background:#2e3a46}
 .kcell{min-width:0}
 @media(max-width:640px){.kgrid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:300px}}
+.mx th.mh{text-align:center;border-top:3px solid var(--pc);border-left:1px solid var(--line);white-space:nowrap}
+.mx th.mh .ico{width:18px;height:18px;vertical-align:-4px;margin-right:5px}
+.mx th.mh span{font-size:12px;color:#a9b4bf}
+.mx td.mx-h,.mx td.mx-p,.mx td.mx-n{text-align:center;border-left:1px solid var(--line)}
+.mx td.mx-h{background:rgba(46,160,67,.22);color:#56d364;font-weight:800}
+.mx td.mx-p{background:rgba(210,153,34,.13);color:#e3b341;font-weight:800}
+.mx td.mx-n{color:#2f3a45}
+.mx td.mx-d{border-left:1px solid var(--line)}
+.mx tbody tr:nth-child(even) td{background-color:rgba(255,255,255,.015)}
+.mx tbody tr:nth-child(even) td.mx-h{background:rgba(46,160,67,.22)}.mx tbody tr:nth-child(even) td.mx-p{background:rgba(210,153,34,.13)}
+@media(max-width:640px){.mx th.mh span{display:none}.mx th.mh .ico{margin:0}}
 </style>
 </head>
 <body>
@@ -594,10 +605,11 @@ function savedHtml(){
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
   const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수'];
+  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'}};
   const cell=a=>!a?'<td class="mx-n">·</td>':a.kind==='high'?'<td class="mx-h">신고가</td>':`<td class="mx-p">${a.pct}%</td>`;
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
    <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
-   <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="r" title="${m}">${m.split(' ')[0]}</th>`).join('')}<th class="r">기준</th></tr></thead>
+   <thead><tr><th>키워드</th><th>분류</th>${MET.map(m=>`<th class="mh" title="${m}" style="--pc:${MC[m].c}">${MC[m].i}<span>${MC[m].t}</span></th>`).join('')}<th class="r">기준</th></tr></thead>
    <tbody>${al.map(r=>{const by=Object.fromEntries(r.alerts.map(a=>[a.metric,a]));const at=r.alerts.map(a=>a.at.slice(0,7)).sort().pop();
      return `<tr class="kwbtn" data-id="${r.id}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m])).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
   return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
