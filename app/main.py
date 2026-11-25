@@ -59,6 +59,12 @@ async def lifespan(app):
     for r in q("SELECT DISTINCT term FROM jobs WHERE kind='mention' AND status!='done' AND term NOT LIKE 'c:%'"):
         if r["term"] not in used:
             x("DELETE FROM jobs WHERE kind='mention' AND status!='done' AND term=?", (r["term"],))
+    # 거대 커뮤니티는 제목만 검색하도록 바뀜 → 그 커뮤니티의 본문 기준 집계는 지우고 다시(한 번만)
+    if not q("SELECT 1 FROM meta WHERE key='giant_title_v1'"):
+        gs = list(C.GIANT_SUBS)
+        x(f"DELETE FROM mention_windows WHERE term NOT LIKE 'c:%' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
+        x(f"DELETE FROM jobs WHERE kind='mention' AND status!='done' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
+        x("INSERT OR REPLACE INTO meta VALUES('giant_title_v1','1',?)", (time.time(),))
     if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done'")
     if not C.AUTO_DISCOVER:

@@ -279,7 +279,7 @@ def _search(job, after, before):
     t = job["term"]
     if t.startswith(CPFX):
         return call(arctic.search_comments, job["sub"], t[len(CPFX):], after, before)
-    return call(arctic.search_posts, job["sub"], t, after, before, C.MENTION_FIELD)   # 제목+본문(query) 기준
+    return call(arctic.search_posts, job["sub"], t, after, before, "title" if job["sub"].lower() in C.GIANT_SUBS else C.MENTION_FIELD)   # 거대 커뮤니티는 제목만, 나머지는 제목+본문
 
 
 def do_mention(job):

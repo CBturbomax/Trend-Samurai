@@ -38,6 +38,12 @@ YT_WEB_START = "2023-12"                                       # 키 없는 유�
 MENTION_MULTIYEAR = False                                      # 여러 해를 한 번에 묻기(아카이브 시간 초과가 잦아 끔, 해 단위로)
 MENTION_POST_START = "2023-01"                                 # 레딧 글 언급 기본 수집 시작 달
 MENTION_FIELD = "query"                                        # 글 언급: 제목+본문(query). 제목만이면 "title"
+# 글이 아주 많은 일반 커뮤니티는 본문 검색이 너무 무거워(아카이브 시간 초과) 제목만 검색 — 같은 커뮤니티 안에선 기준이 일정해 추세는 유효
+GIANT_SUBS = {s.lower() for s in """anime gaming games pcgaming truegaming japan japantravel japantraveltips tokyo japanlife costco traderjoes
+femalefashionadvice malefashionadvice streetwear sneakers running watches buyitforlife cooking fastfood edc toys collectibles
+nostalgia 90s fishing cycling bicycling camping campinggear hiking loseit gym supplements nutrition nyc foodporn
+skincareaddiction makeupaddiction beauty asianbeauty sephora ulta tennis 10s pickleball parenting toddlers daddit
+smartglasses gadgets kawaii plushies blindboxes actionfigures tcg anime_irl""".split()}
 MENTION_COMMENTS = False                                       # 댓글 본문 언급 검색(무겁고 거의 안 받아짐 → 끔, 글 언급에 집중)
 COMMENT_MONTHS = 24                                            # 레딧 댓글 언급은 최근 이만큼의 달만
 
