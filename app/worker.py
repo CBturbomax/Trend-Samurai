@@ -307,8 +307,8 @@ def do_mention(job):
                     _add(job["keyword_id"], "mention", 3 if not job["term"].startswith(CPFX) else 5, sub=sub,
                          term=job["term"], month=last_m, start=month_bounds(last_m)[0], end=month_bounds(last_m)[1])
                     rest = month_bounds(last_m)[1]
-                if rest < job["end"]:
-                    _add(job["keyword_id"], "mention", 2 if not job["term"].startswith(CPFX) else 4, sub=sub,
+                if rest < job["end"]:   # 큰 커뮤니티의 남은 기간은 뒤로(작은 곳들을 먼저 끝내 키워드가 빨리 완성되게)
+                    _add(job["keyword_id"], "mention", 7 if not job["term"].startswith(CPFX) else 8, sub=sub,
                          term=job["term"], month=job["month"], start=rest, end=job["end"])
                 state["sub_streak"][sub] = 0
                 return _set(job, "done", f"{len(ts)}건 받음 → ~{last_m} 저장, 나머지는 이어서")
@@ -793,7 +793,7 @@ def _next(kinds=None):
         state["rturn"] = state.get("rturn", 0) + 1
         if state["rturn"] % 2 == 0:
             r = q("SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind='mention' "
-                  "ORDER BY priority, month DESC, id LIMIT 1", (now,))
+                  "ORDER BY priority, tries, month DESC, id LIMIT 1", (now,))   # 계속 실패하는 무거운 작업보다 새 작업 먼저
     if not r:
         r = q(f"SELECT * FROM jobs WHERE status='queued' AND next_at<=? AND kind IN ({ks}) "
               "ORDER BY priority, month DESC, id LIMIT 1", (now, *kinds))
