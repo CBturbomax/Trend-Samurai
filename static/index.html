@@ -385,7 +385,7 @@ function mentionCharts(d,o){
   const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 언급 ${what} 수 · 수집 중</div>`;
     return chart(id,{...o,title:`레딧 · 키워드 언급 ${what} 수 (커뮤니티 ${n}곳 합계)`,desc,series:totalOf('합계',mentionParts(d,key))})};
   return one('men-s','mentions','글','개/월')
-    +one('men-c','mentions_c','댓글','개/월');
+;
 }
 function redditManage(d){
   const cands=d.candidates.length?`<div class="box"><b>후보</b><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 6개월 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';
@@ -398,8 +398,8 @@ function redditTotal(d){
   if(!Object.keys(d.own).length)return '';   // 전용 커뮤니티가 없으면 아래 언급 합계와 같으므로 생략
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:''};
   const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용·전체)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
-  const mk=(id,i,key,what)=>{const l=[...own(i),...mentionParts(d,key).map(x=>({...x,name:x.name+' (언급)'}))];if(l.length<2)return '';
-    return chart(id,{...o,title:`레딧 합산 · 키워드 관련 ${what} 수`,desc:'개/월',series:totalOf('레딧 합계',l)})};
+  const mk=(id,i,key,what)=>{const l=[...own(i),...(i?[]:mentionParts(d,key).map(x=>({...x,name:x.name+' (언급)'})))];if(!l.length)return '';
+    return chart(id,{...o,title:i?'레딧 · 전용 커뮤니티 댓글 수':`레딧 합산 · 키워드 관련 ${what} 수`,desc:'개/월',series:totalOf('레딧 합계',l)})};
   return mk('rt-p',0,'mentions','글')+mk('rt-c',1,'mentions_c','댓글');
 }
 function viewReddit(d){   // 전용 커뮤니티가 있으면 '합산' 하나로(범례에서 전용·언급을 골라 볼 수 있음), 없으면 언급 합계만

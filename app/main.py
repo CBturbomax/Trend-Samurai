@@ -43,6 +43,8 @@ async def lifespan(app):
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")
+    if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
+        x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done'")
     if not C.AUTO_DISCOVER:
         x("DELETE FROM jobs WHERE kind='discover' AND status IN ('queued','hold')")
     x("UPDATE jobs SET status='queued', next_at=0, tries=0 WHERE kind='yt' AND status='hold'")   # 유튜브 보류분은 재시작 때 다시

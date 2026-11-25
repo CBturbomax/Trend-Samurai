@@ -121,7 +121,7 @@ def enqueue_keyword(kid, refresh=False):
         noc = bool(q("SELECT 1 FROM meta WHERE key=?", (f"nocomment:{s['name']}",)))
         comment_from = all_months()[0 if full else -C.COMMENT_MONTHS]
         rt = reddit_terms(kid)
-        for t in rt + ([] if noc else [CPFX + t for t in rt]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
+        for t in rt + ([] if noc or not C.MENTION_COMMENTS else [CPFX + t for t in rt]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
