@@ -269,14 +269,20 @@ def keywords():
             rp += q(f"SELECT IFNULL(SUM(count),0) v FROM mention_windows WHERE start>=? AND status!='split' "
                     f"AND sub IN ({','.join('?'*len(men))}) AND term IN ({','.join('?'*len(terms))})", (since, *men, *terms))[0]["v"]
         v, n = ytv.get(kid, (0, 0))
-        k["m"] = {"yt_views": v, "yt_videos": n, "reddit_posts": rp}
+        # 아직 받은 데이터가 없는 지표는 '없음'(0점이 아니라 점수 계산에서 뺌)
+        has_r = bool(own and q(f"SELECT 1 FROM sub_monthly WHERE sub IN ({','.join('?'*len(own))}) LIMIT 1", own)) or \
+            bool(men and terms and q(f"SELECT 1 FROM mention_windows WHERE status!='split' AND start>=? AND sub IN ({','.join('?'*len(men))}) "
+                                     f"AND term IN ({','.join('?'*len(terms))}) LIMIT 1", (since, *men, *terms)))
+        k["m"] = {"yt_views": v if n else None, "yt_videos": n if n else None, "reddit_posts": rp if has_r else None}
     for key in ("yt_views", "yt_videos", "reddit_posts"):
-        vals = sorted(k["m"][key] for k in ks)
-        for k in ks:   # 백분위: 나보다 작은 키워드 비율
-            k["m"][key + "_pct"] = round(100 * sum(1 for x in vals if x < k["m"][key]) / max(1, len(vals) - 1))
+        vals = sorted(k["m"][key] for k in ks if k["m"][key] is not None)
+        for k in ks:   # 백분위: 데이터가 있는 키워드 중 나보다 작은 비율
+            x = k["m"][key]
+            k["m"][key + "_pct"] = None if x is None else round(100 * sum(1 for y in vals if y < x) / max(1, len(vals) - 1))
     for k in ks:
-        m = k["m"]
-        k["score"] = round((m["yt_views_pct"] + m["yt_videos_pct"] + m["reddit_posts_pct"]) / 3)
+        ps = [k["m"][key + "_pct"] for key in ("yt_views", "yt_videos", "reddit_posts") if k["m"][key + "_pct"] is not None]
+        k["score"] = round(sum(ps) / len(ps)) if ps else 0
+        k["n_metrics"] = len(ps)
     f = C.ROOT / "seed" / "importance.txt"
     order = [l.strip().lower() for l in f.read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")] if f.exists() else []
     rank = {n: i for i, n in enumerate(order)}
