@@ -49,6 +49,9 @@ async def lifespan(app):
         x("DELETE FROM mention_windows WHERE term NOT LIKE 'c:%'")
         x("DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status!='done'")
         x("INSERT OR REPLACE INTO meta VALUES('mention_field',?,?)", (C.MENTION_FIELD, time.time()))
+    # '새 키워드 우선'은 추가 후 6시간까지만 → 지난 키워드의 앞당김은 되돌림(중요도 순서가 먹히게)
+    x("UPDATE jobs SET priority=priority+10 WHERE priority<0 AND status IN ('queued','hold') AND keyword_id IN "
+      "(SELECT id FROM keywords WHERE created_at < ?)", ((datetime.now(timezone.utc) - __import__('datetime').timedelta(hours=6)).isoformat(),))
     if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done'")
     if not C.AUTO_DISCOVER:

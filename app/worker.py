@@ -56,7 +56,7 @@ def _is_new(kid):
     try:
         t = dt.datetime.fromisoformat(r[0]["created_at"])
         t = t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
-        return dt.datetime.now(dt.timezone.utc) - t < dt.timedelta(hours=24)
+        return dt.datetime.now(dt.timezone.utc) - t < dt.timedelta(hours=6)
     except ValueError:
         return False
 
