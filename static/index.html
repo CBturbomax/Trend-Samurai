@@ -183,6 +183,16 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .al-b{font-size:11px;font-weight:700;padding:2px 6px;border:1px solid}
 .al-b.high{color:#3fb950;border-color:#2f6f3a}.al-b.near{color:#d9b84a;border-color:#6b5a22}
 .kcell .hi{font-style:normal;color:#3fb950;font-size:10px;margin-left:5px}
+.alerts{margin-bottom:18px}
+.al-head{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}
+.al-head h3{font-size:15px;font-weight:800;margin:0;color:#fff}
+.al-head span{font-size:12px;color:#7d8996}
+.al-wrap{max-height:260px;overflow:auto;border:1px solid var(--line)}
+.al-table th{position:sticky;top:0;font-size:12px;padding:8px 10px;text-align:left}
+.al-table td{font-size:13px;padding:7px 10px;text-align:left;font-weight:600}
+.al-table td:first-child{font-weight:800;color:#fff}
+.al-table td.up{color:#3fb950}.al-table td.nr{color:#d9b84a}
+.al-tr{cursor:pointer}.al-tr:hover td{background:rgba(255,255,255,.03)}
 </style>
 </head>
 <body>
@@ -469,7 +479,7 @@ const ICO={
  google:'<svg class="ico" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="#fff"/><path d="M10 4.2a5.8 5.8 0 1 0 5.6 7.1H10V8.9h8" fill="none" stroke="#4285F4" stroke-width="2.6"/><path d="M4.6 7.6A5.8 5.8 0 0 1 14 5.6" fill="none" stroke="#EA4335" stroke-width="2.6"/><path d="M4.4 12.3a5.8 5.8 0 0 0 1.6 2.3" fill="none" stroke="#FBBC05" stroke-width="2.6"/><path d="M6 14.6a5.8 5.8 0 0 0 8 .6" fill="none" stroke="#34A853" stroke-width="2.6"/></svg>',
  tiktok:'<svg class="ico" viewBox="0 0 20 20"><rect width="20" height="20" rx="5" fill="#000"/><text x="10.8" y="15.2" font-size="13" font-weight="900" text-anchor="middle" fill="#FE2C55">♪</text><text x="9.4" y="14.2" font-size="13" font-weight="900" text-anchor="middle" fill="#25F4EE">♪</text><text x="10" y="14.7" font-size="13" font-weight="900" text-anchor="middle" fill="#fff">♪</text></svg>'};
 const PLAT={reddit:{c:'#FF4500',i:ICO.reddit},yt:{c:'#FF0000',i:ICO.yt},google:{c:'#4285F4',i:ICO.google},tiktok:{c:'#25F4EE',i:ICO.tiktok}};
-const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글'],['year','요약표']];
+const TABS=[['reddit',ICO.reddit+'레딧'],['yt',ICO.yt+'유튜브'],['tiktok',ICO.tiktok+'틱톡'],['google',ICO.google+'구글']];
 const VIEW={reddit:viewReddit,yt:viewYT,tiktok:viewTiktok,google:viewGoogle,year:yearTable};
 function kpis(d){
   const lm=d.months[d.months.length-2],sum=l=>{const v=l.map(s=>s.pts[lm]).filter(v=>v!=null);return v.length?v.reduce((a,b)=>a+b,0):null};
@@ -486,7 +496,7 @@ function render(){
     $('#kpis').innerHTML='';$('#progress').style.display='none';
     const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
     $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
-      <div class="filters">${tg2(TABS.filter(t=>t[0]!=='year'),'tab',S.tab,'tab')}</div>
+      <div class="filters">${tg2(TABS,'tab',S.tab,'tab')}</div>
       <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['WW','전세계'],['US','미국']],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
     return}
   $('#kpis').innerHTML=kpis(d);
@@ -539,7 +549,8 @@ function savedHtml(){
   const list=f?all.filter(k=>k.name.includes(f)):groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
-  const abox=al.length?`<div class="alerts"><div class="al-h"><b>신고가</b> ${nh} <span>· 근접 ${al.length-nh}</span></div><div class="al-list">${al.map(r=>`<button class="al-row kwbtn" data-id="${r.id}"><span class="al-k">${esc(r.keyword)}</span>${r.alerts.map(a=>`<span class="al-b ${a.kind}">${a.kind==='high'?'▲ ':''}${esc(a.metric)}${a.kind==='near'?' '+a.pct+'%':''}</span>`).join('')}</button>`).join('')}</div></div>`:'';
+  const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span>신고가 ${nh} · 근접 ${al.length-nh} · 최근 완료 기간 기준</span></div>
+   <div class="table-wrap al-wrap"><table class="data-table al-table"><thead><tr><th>키워드</th><th>지표</th><th>상태</th><th>기간</th></tr></thead><tbody>${al.flatMap(r=>r.alerts.map((a,j)=>`<tr class="kwbtn al-tr" data-id="${r.id}"><td>${j?'':esc(r.keyword)}</td><td>${esc(a.metric)}</td><td class="${a.kind==='high'?'up':'nr'}">${a.kind==='high'?'신고가':'최고 대비 '+a.pct+'%'}</td><td>${esc(a.at)}</td></tr>`)).join('')}</tbody></table></div></section>`:'';
   return abox+`<div class="filters">${seg([['category','카테고리'],['country','국가']],'grpby',S.groupBy,'g')}${seg([['score','인기순'],['rank','중요도순']],'sortby',S.sortBy,'o')}
      <label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
    ${f?'':`<div class="kcats">${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
@@ -551,10 +562,9 @@ async function loadAlerts(){try{S.alerts=await api('/api/alerts');S.alertIds={};
 setInterval(loadAlerts,600000);
 async function loadSaved(){
   S.ks=await api('/api/keywords');renderSaved();if(!S.alerts)loadAlerts();
-  if(!S.kid&&!S.started&&S.ks.length){S.started=true;S.sel=[];await select(S.ks[0].id);S.autoSel=true}
+
 }
 async function select(id){   // 누를 때마다 선택에 넣고/빼기. 2개 이상이면 겹쳐서 비교
-  if(S.autoSel){S.autoSel=false;S.sel=[]}   // 처음 자동으로 열린 키워드는 첫 클릭 때 바꿔 끼움
   if(S.sel.includes(id))S.sel=S.sel.filter(x=>x!==id);else S.sel.push(id);
   if(!S.sel.length){S.kid=null;S.data=null;$('#progress').style.display='none';render();renderSaved();return}
   S.kid=S.sel[S.sel.length-1];lastDone=-1;
