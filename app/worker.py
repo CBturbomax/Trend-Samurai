@@ -236,6 +236,16 @@ def _split_years(job):
              month=f"{y}-12", start=a, end=min(b, job["end"]))
 
 
+def _search_retry(job, after, before, n=6):
+    """이어 받는 도중 한 장이 막혀도 그 장만 다시(전엔 처음부터 다시 받아 긴 기간은 거의 안 끝났음)."""
+    for i in range(n):
+        try:
+            return _search(job, after, before)
+        except arctic.SlowDown:
+            if i == n - 1:
+                raise
+
+
 def _search(job, after, before):
     t = job["term"]
     if t.startswith(CPFX):
@@ -249,14 +259,14 @@ def do_mention(job):
     days = (b - a).days
     was_hold = job["status_before"] == "hold"
     try:
-        ts = _search(job, job["start"], job["end"])
+        ts = _search_retry(job, job["start"], job["end"], 3)
         n = len(ts)
         if days > 40:   # 여러 달짜리 요청: 100건씩 이어 받아 달별로 나눔(달마다 따로 묻는 것보다 요청 수가 훨씬 적음)
             months = [m for m in all_months() if job["start"][:7] <= m and month_bounds(m)[1] <= max(job["end"], month_bounds(job["start"][:7])[1])]
             page = ts
             pages = 1
             while len(page) == 100 and pages < MAX_PAGES:
-                page = _search(job, page[-1] + 1, job["end"])
+                page = _search_retry(job, page[-1] + 1, job["end"])
                 ts = ts + page
                 pages += 1
             if len(page) == 100 and days > 400:  # 여러 해 → 해 단위로 다시
@@ -284,7 +294,7 @@ def do_mention(job):
         if n >= 100 and days > 1:   # 한 달 창이 꽉 참 → 반으로 나누지 않고 이어 받기
             page = ts
             while len(page) == 100:
-                page = _search(job, page[-1] + 1, job["end"])
+                page = _search_retry(job, page[-1] + 1, job["end"])
                 n += len(page)
             ts = []
         while len(ts) == 100:  # 하루짜리 창인데도 100건: 이어서 받기
