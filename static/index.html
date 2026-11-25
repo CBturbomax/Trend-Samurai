@@ -181,13 +181,6 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 <section class="progress" id="progress"></section>
 <section id="result"></section>
 
-<footer class="notes">
-  <p><strong>월 합계</strong>가 기본. <strong>하루 평균</strong>으로 바꾸면 월 합계 ÷ 날짜 수(진행 중인 달은 오늘까지 일수)로 보여 줌. 자체 계산, 공식 수치 아님.</p>
-  <p><strong>검색 관심도</strong>는 0~100 지수. 같은 차트 안의 선끼리만 높이 비교 가능. <strong>미국 | 전세계</strong> 버튼은 구글·유튜브 검색 관심도에 적용(레딧 글·유튜브 영상 수는 지역 구분이 없는 전세계 값).</p>
-    <p><strong>틱톡</strong>은 해시태그의 누적 게시물 수·조회수만 받을 수 있어, 매일 기록한 값의 차이로 추세를 봄.</p>
-  <p><strong>유튜브</strong> 과거 달의 조회수는 '그 달에 올라온 영상의 현재 누적값'. 실제 증가 추세는 매일 기록하는 누적값으로 봄.</p>
-  <p><strong>출처</strong> arctic-shift(제3자 레딧 아카이브, 비공식), Google Trends(비공식), YouTube 검색(비공식), TikTok 해시태그 페이지(비공식). 개인 리서치용.</p>
-</footer>
 </main>
 
 <script>
@@ -233,7 +226,7 @@ function chart(id,o){
       head=`<div class="chd"><span class="chd-v">${fmtS(v)}</span><span class="chd-m">${lm}</span>${ch==null?'':`<span class="chd-c ${ch>=0?'up':'down'}">${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(Math.abs(ch)<10?1:0)}% <small>YoY</small></span>`}</div>`}}
   return `<section class="panel chart-panel"${pl?` style="--acc:${pl.c}"`:''}><div class="panel-head"><h2>${pl?pl.i:''}${esc(o.title)}</h2><span class="unit">${o.desc||''}</span></div>${head}${lg}
    ${empty?'<div class="box dim">수집 중</div>':`<div class="chart-box pcwrap">${lineSvg(id,months,series,o)}<div class="tip"></div></div>`}
-   <div class="foot"><span>${o.foot||''}</span><span class="src">${esc(o.source)}</span></div></section>`;
+</section>`;
 }
 function maxOf(series,months){let mx=0;series.forEach(s=>months.forEach(m=>{const v=s.pts[m];if(v!=null&&v>mx)mx=v}));return mx}
 const SZ=()=>innerWidth<640?{W:420,H:250,L:40,R:46,T:14,B:26,f:11}:{W:1100,H:400,L:56,R:70,T:18,B:34,f:13};
@@ -333,7 +326,7 @@ function yearTable(d){
   <div class="table-wrap"><table class="data-table"><thead><tr><th>지표</th>${years.map(y=>`<th><span class="h-pc">${y}</span><span class="h-mo">${yy(y)}</span></th>`).join('')}
   <th><span class="h-pc">${yy(LY-1)} / ${yy(LY-2)}</span><span class="h-mo">${yy(LY-1)}/${yy(LY-2)}</span></th><th><span class="h-pc">${yy(LY)} / ${yy(LY-1)}</span><span class="h-mo">${yy(LY)}/${yy(LY-1)}</span></th></tr></thead><tbody>
   ${rows.map(r=>r.sec?`<tr class="sec"><td colspan="${years.length+3}">${r.sec}</td></tr>`:`<tr><td><span class="h-pc">${esc(r.label)}</span><span class="h-mo">${esc(r.short)}</span></td>${years.map(y=>`<td>${fmtS(yearAgg(r.s,d,y))||'–'}</td>`).join('')}${pct(yearAgg(r.s,d,LY-1),yearAgg(r.s,d,LY-2))}${pct(yearAgg(r.s,d,LY),yearAgg(r.s,d,LY-1,LM))}</tr>`).join('')}
-  </tbody></table></div><div class="foot"><span>자체 계산, 공식 수치 아님. '–' = 데이터 없음(서브레딧 생성 전 또는 미수집). 빨강 = 증가, 파랑 = 감소.</span><span class="src">출처: arctic-shift, Google Trends</span></div></section>`;
+  </tbody></table></div></section>`;
 }
 
 /* ───── 탭별 화면 ───── */
@@ -358,7 +351,7 @@ function viewGlobal(d){
    + mk('glob-p','submission','레딧 전체 · 키워드가 언급된 글 수','단위: 개/월. 제목이나 본문에 키워드가 든 글.')
    + `<section class="panel"><div class="panel-head"><h2>어느 서브레딧에서 언급되나</h2><span class="count">최근 14개월 합계 · 상위 ${top.length}곳</span></div>
      ${top.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>서브레딧</th><th>글</th><th>댓글</th><th>합계</th></tr></thead><tbody>${top.map(t=>`<tr><td>r/${esc(t.sub)}</td><td>${t.submission.toLocaleString()}</td><td>${t.comment.toLocaleString()}</td><td>${(t.submission+t.comment).toLocaleString()}</td></tr>`).join('')}</tbody></table></div>`:'<div class="box dim">수집 중</div>'}
-     <div class="foot"><span>자체 집계, 공식 수치 아님.</span><span class="src">출처: ${src}</span></div></section>`;
+     </section>`;
 }
 /* 유튜브 (공식 API). 과거 달 값은 '그 달에 올라온 영상' 기준 */
 function ytSeries(d,idx,name,color){const pts={};Object.entries((d.youtube||{}).months||{}).forEach(([m,v])=>pts[m]=v[idx]);return{name,color,pts}}
@@ -374,10 +367,10 @@ function viewYoutube(d){
    + chart('yt-v',{...o,title:'유튜브 · 조회수 합 (올라온 달 기준)',desc:'회 · 그 달에 올라온 영상의 현재 누적 조회수',foot:'',series:[ytSeries(d,1,'조회수 합',PAL[1])]})
    + `<section class="panel"><div class="panel-head"><h2>유튜브 · 매일 기록하는 누적값</h2><span class="count">추적 영상 ${(y.total||0).toLocaleString()}개 · 오늘부터 쌓이는 실제 증가 추세</span></div>
      ${snaps.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>날짜</th><th>영상 수</th><th>누적 조회수</th><th>전날 대비</th></tr></thead><tbody>${snaps.slice(0,14).map((r,i)=>{const p=snaps[i+1],dv=p?r.views-p.views:null;return `<tr><td>${r.day}</td><td>${r.videos.toLocaleString()}</td><td>${r.views.toLocaleString()}</td><td class="${dv>0?'up':''}">${dv==null?'–':'+'+dv.toLocaleString()}</td></tr>`}).join('')}</tbody></table></div>`:'<div class="box dim">수집 중</div>'}
-     <div class="foot"><span>전날 대비 = 하루 동안 늘어난 조회수(새로 찾은 영상 포함).</span><span class="src">출처: ${SRC}</span></div></section>`
+     </section>`
    + `<section class="panel"><div class="panel-head"><h2>유튜브 · 조회수 상위 영상</h2><span class="count">상위 ${top.length}개</span></div>
      ${top.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>영상</th><th>채널</th><th>게시일</th><th>조회수</th></tr></thead><tbody>${top.map(v=>`<tr><td style="white-space:normal;min-width:220px">${link(v)}</td><td>${esc(v.channel.slice(0,22))}</td><td>${v.published}</td><td>${v.views.toLocaleString()}</td></tr>`).join('')}</tbody></table></div>`:'<div class="box dim">수집 중</div>'}</section>`
-   + (ch.length?`<section class="panel"><div class="panel-head"><h2>유튜브 · 조회수 상위 채널</h2></div><div class="table-wrap"><table class="data-table"><thead><tr><th>채널</th><th>영상 수</th><th>조회수 합</th></tr></thead><tbody>${ch.map(c=>`<tr><td>${esc(c.channel)}</td><td>${c.n.toLocaleString()}</td><td>${c.views.toLocaleString()}</td></tr>`).join('')}</tbody></table></div><div class="foot"><span>자체 집계, 공식 통계 아님.</span><span class="src">출처: ${SRC}</span></div></section>`:'');
+   + (ch.length?`<section class="panel"><div class="panel-head"><h2>유튜브 · 조회수 상위 채널</h2></div><div class="table-wrap"><table class="data-table"><thead><tr><th>채널</th><th>영상 수</th><th>조회수 합</th></tr></thead><tbody>${ch.map(c=>`<tr><td>${esc(c.channel)}</td><td>${c.n.toLocaleString()}</td><td>${c.views.toLocaleString()}</td></tr>`).join('')}</tbody></table></div></section>`:'');
 }
 function viewOwn(d){
   if(!Object.keys(d.own).length)return '';
@@ -399,7 +392,7 @@ function redditManage(d){
    <div class="row">${d.subs.filter(x=>x.kind==='mention').map(x=>`<span class="chip">r/${esc(x.name)} <a href="#" class="rmsub warn" data-s="${esc(x.name)}">✕</a></span>`).join('')||'<span class="dim">없음</span>'}</div>
    ${cands}<div class="filters"><label class="search-box"><input type="text" id="addSubs" placeholder="서브레딧 추가"></label><button class="btn main" id="btnProbe">후보로 넣고 자동 선별</button><button class="btn" id="btnAddSubs">바로 추가</button></div></div></details>`;
 }
-function viewMention(d){return mentionCharts(d)+redditManage(d)}
+function viewMention(d){return mentionCharts(d)}
 function redditTotal(d){
   if(!Object.keys(d.own).length)return '';   // 전용 커뮤니티가 없으면 아래 언급 합계와 같으므로 생략
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:''};
@@ -410,7 +403,7 @@ function redditTotal(d){
 }
 function viewReddit(d){   // 전용 커뮤니티가 있으면 '합산' 하나로(범례에서 전용·언급을 골라 볼 수 있음), 없으면 언급 합계만
   const own=Object.keys(d.own).length,ment=Object.keys(d.mentions||{}).length;
-  return (d.global&&d.global.enabled?viewGlobal(d):'')+(own&&ment?redditTotal(d):own?viewOwn(d):mentionCharts(d))+redditManage(d)}
+  return (d.global&&d.global.enabled?viewGlobal(d):'')+(own&&ment?redditTotal(d):own?viewOwn(d):mentionCharts(d))}
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
   const tags=d.tiktok||[],hist=d.tiktok_history||[];
@@ -586,7 +579,7 @@ function exportHtml(){
   body=(d.global&&d.global.enabled?viewGlobal(d):'')+viewOwn(d)+mentionCharts(d)+viewYT(d)+viewTiktok(d)+viewGoogle(d)+yearTable(d);
   const html=`<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.keyword)} · Trend Samurai</title>
 <link href="https://fonts.googleapis.com/css2?family=42dot+Sans:wght@300..800&display=swap" rel="stylesheet"><style>${$('#css').textContent} .lg{pointer-events:none}</style></head><body><main class="dash"><header class="dash-head"><div><h1>${esc(d.keyword).toUpperCase()}</h1></div></header><section class="kpi-strip">${kpis(d)}</section>${body}
-<footer class="notes"><p>개인 리서치용. arctic-shift·Google Trends 비공식 데이터 기반이며 <strong>자체 계산값은 공식 수치가 아닙니다.</strong></p></footer></main></body></html>`;
+</main></body></html>`;
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=`${d.keyword}-report-${d.today}.html`;a.click();
 }
 loadSaved();pollStatus();
