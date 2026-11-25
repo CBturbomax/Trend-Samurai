@@ -225,6 +225,10 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 .lg{font-size:14px;padding:6px 12px}
 .empty-chart svg{display:block;width:100%;height:auto}
 @media(max-width:640px){.kgrid{grid-template-columns:repeat(2,1fr)}.kcell{font-size:15px;padding:11px 10px}.kcat{font-size:15px;padding:10px 12px}.toggle{font-size:14px;padding:8px 13px}.mx{font-size:13px}.mx th,.mx td{padding:8px 6px}}
+.kgrid{max-height:340px;overflow:auto;scrollbar-width:thin;scrollbar-color:#2e3a46 transparent;padding-right:2px}
+.kgrid::-webkit-scrollbar{width:8px}.kgrid::-webkit-scrollbar-thumb{background:#2e3a46}
+.kcell{min-width:0}
+@media(max-width:640px){.kgrid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:300px}}
 </style>
 </head>
 <body>
