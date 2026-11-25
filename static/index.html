@@ -211,7 +211,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
   <div id="savedBox"></div>
 </section>
 
-<section class="kpi-strip" id="kpis"></section>
+<section id="kpis" style="display:none"></section>
 <section class="progress" id="progress"></section>
 <section id="result"></section>
 
@@ -499,7 +499,7 @@ function render(){
       <div class="filters">${tg2(TABS,'tab',S.tab,'tab')}</div>
       <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['WW','전세계'],['US','미국']],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
     return}
-  $('#kpis').innerHTML=kpis(d);
+  $('#kpis').innerHTML='';
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
   $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span>
    <span class="count">분류 <select class="gsel" id="gCat"><option value="">미분류</option>${CATS.map(c=>`<option ${d.category===c?'selected':''}>${c}</option>`).join('')}</select>
