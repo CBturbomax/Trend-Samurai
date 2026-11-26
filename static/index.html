@@ -300,7 +300,12 @@ function chart(id,o){
   const hid=S.hidden[id]||(S.hidden[id]=new Set(o.defaultHidden||[]));
   // 합산 차트: part 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
   const parts=o.series.filter(s=>s.part),inc=parts.filter(s=>!hid.has(s.name));
-  o.series.forEach(s=>{if(s.isTotal){const pts={};o.months.forEach(m=>{const v=inc.map(p=>p.pts[m]).filter(x=>x!=null);if(v.length)pts[m]=v.reduce((a,b)=>a+b,0)});s.pts=pts}});
+  // 합계: 포함한 커뮤니티 중 하나라도 아직 안 받은 달은 빼고 그림(덜 받은 달을 더하면 가짜로 튀거나 꺼짐)
+  o.series.forEach(s=>{if(s.isTotal){const pts={};o.months.forEach(m=>{if(m===o.cur)return;
+    const miss=inc.some(p=>{if(p.pts[m]!=null)return false;const st=p.from||Object.keys(p.pts).sort()[0];return st&&m>=st});
+    const v=inc.map(p=>p.pts[m]).filter(x=>x!=null);if(v.length&&!miss)pts[m]=v.reduce((a,b)=>a+b,0)});
+    if(o.cur){const v=inc.map(p=>p.pts[o.cur]).filter(x=>x!=null);if(v.length&&!inc.some(p=>p.pts[o.cur]==null&&Object.keys(p.pts).length))pts[o.cur]=v.reduce((a,b)=>a+b,0)}
+    s.pts=pts}});
   const series=o.series.filter(s=>!s.part&&!hid.has(s.name));
   let months=o.daily?o.months:visMonths(o.months);
   const f0=months.findIndex(m=>series.some(s=>s.pts[m]!=null&&s.pts[m]>0));   // 데이터가 시작되기 전 빈 기간은 잘라냄
@@ -497,7 +502,7 @@ function redditTotal(d){
   if(!Object.keys(d.own).length)return '';   // 전용 커뮤니티가 없으면 아래 언급 합계와 같으므로 생략
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:''};
   const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용·전체)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
-  const mk=(id,i,key,what)=>{const l=[...own(i),...(i?[]:mentionParts(d,key).map(x=>({...x,name:x.name+' (언급)'})))];if(!l.length)return '';
+  const mk=(id,i,key,what)=>{const l=[...own(i),...(i?[]:mentionParts(d,key).map(x=>({...x,from:'2023-01',name:x.name+' (언급)'})))];if(!l.length)return '';
     return chart(id,{...o,title:i?'레딧 · 전용 커뮤니티 댓글 수':`레딧 · 주요 커뮤니티 ${l.length}곳 ${what} 수`,desc:'개/월',series:totalOf('레딧 합계',l)})};
   return mk('rt-p',0,'mentions','글')+mk('rt-c',1,'mentions_c','댓글');
 }
