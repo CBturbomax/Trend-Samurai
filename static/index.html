@@ -340,10 +340,11 @@ function lineSvg(id,months,series,o){
     else if(yrs>2){if(first)t=m.slice(0,4)}else if(first)t=m.slice(0,4);else if(['04','07','10'].includes(mm))t=+mm+'월';
     if(t)g+=`<text x="${X(i)}" y="${H-B+f+8}" text-anchor="middle" fill="${first?'#c5cdd6':'#7d8996'}" font-size="${f}">${t}</text>`+(first&&i?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".06"/>`:'')});
   const ends=[];
-  series.forEach((s,k)=>{let d='',pen=false,first=null,last=null;
-    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}d+=(pen?'L':'M')+X(i).toFixed(1)+' '+Yv(v).toFixed(1);pen=true;if(first==null)first=i;last=i});
+  series.forEach((s,k)=>{let d='',pen=false,first=null,last=null;const segs=[];
+    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}const p=X(i).toFixed(1)+' '+Yv(v).toFixed(1);d+=(pen?'L':'M')+p;
+      if(pen){const g2=segs[segs.length-1];g2.d+='L'+p;g2.b=i}else segs.push({d:'M'+p,a:i,b:i});pen=true;if(first==null)first=i;last=i});
     if(!d)return;
-    if(series.length===1&&first!=null)g+=`<path d="${d}L${X(last).toFixed(1)} ${T+ph}L${X(first).toFixed(1)} ${T+ph}Z" fill="url(#gr-${id}-${k})"/>`;
+    if(series.length===1)segs.forEach(sg=>{g+=`<path d="${sg.d}L${X(sg.b).toFixed(1)} ${T+ph}L${X(sg.a).toFixed(1)} ${T+ph}Z" fill="url(#gr-${id}-${k})"/>`});   // 빈 구간은 채우지 않음
     g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.bold||s.isTotal||series.length===1?2.4:1.8}" stroke-linejoin="round" stroke-linecap="round"/>`;
     if(ci>0&&s.pts[o.cur]!=null&&s.pts[months[ci-1]]!=null)g+=`<line x1="${X(ci-1)}" y1="${Yv(s.pts[months[ci-1]])}" x2="${X(ci)}" y2="${Yv(s.pts[o.cur])}" stroke="${s.color}" stroke-width="1.6" stroke-dasharray="3 4" stroke-opacity=".7"/>`;
     months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci)return;g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="${i===last?4:n>60?1.8:2.6}" fill="${s.color}" stroke="#11171d" stroke-width="1"/>`});
