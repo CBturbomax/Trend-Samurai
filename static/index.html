@@ -512,8 +512,8 @@ function viewTiktok(d){
   const hist=d.tiktok_history||[],src=d.tiktok_src||{},isV=src.unit==='views',co=(src.label||'').replace(/\s*\(.*$/,'');
   if(hist.length<2)return '<div class="box dim">틱톡 자료 없음</div>';
   const pts=Object.fromEntries(hist.map(r=>[r.week,r.value])),wk=hist.map(r=>r.week);
-  if(isV&&!d.tiktok_mixed)return chart('tt-hist',{daily:true,months:wk,cur:null,title:`틱톡 · 해시태그 영상 조회수 (주간, 2년) — ${esc(co)} 브랜드 합산`,
-    desc:`회/주 · ${esc(src.label||'')}의 브랜드 해시태그 합(대부분 ${esc(d.keyword)})`,foot:'',source:'',series:[{name:'조회수',color:PAL[3],pts}]});
+  if(isV)return chart('tt-hist',{daily:true,months:wk,cur:null,title:`틱톡 · 해시태그 영상 조회수 (주간, 2년) — ${esc(co)} 브랜드 합산`,
+    desc:`회/주 · ${esc(src.label||'')} 해시태그 합`,foot:'',source:'',series:[{name:'조회수',color:PAL[3],pts}]});
   if(isV)return `<div class="box dim small warn">${esc(co)}의 여러 브랜드가 합쳐진 값이라 ${esc(d.keyword)} 반응으로 보기 어려움 · 참고만</div>`
     +chart('tt-hist',{daily:true,months:wk,cur:null,title:`참고 · ${esc(co)} 전체 해시태그 영상 조회수 (주간)`,desc:'회/주 · 여러 브랜드 합산',foot:'',source:'',series:[{name:'회사 전체',color:'#6b7785',pts}]});
   return `<div class="box dim small warn">게시물 활동 지수 · 2026-10부터 집계 기준이 바뀌어 급등 · 참고만</div>`
@@ -629,7 +629,7 @@ async function pollStatus(){
       <span class="pchip">${ICO.yt}유튜브 ${st(!pend(['yt','ytstats']),pend(['yt','ytstats'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.google}구글 ${st(!pend(['trends']),pend(['trends'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.pin}핀터레스트 ${(d.trends_w||[]).some(t=>t.gprop==='pinterest'&&Object.keys(t.points).length)?st(true,'완료'):pend(['pin'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span>
-      <span class="pchip">${ICO.tiktok}틱톡 ${(d.tiktok_history||[]).length>1?(d.tiktok_src||{}).unit==='views'&&!d.tiktok_mixed?st(true,'완료'):'<span class="pst none">참고만</span>':'<span class="pst none">자료 없음</span>'}</span></div>`;
+      <span class="pchip">${ICO.tiktok}틱톡 ${(d.tiktok_history||[]).length>1?(d.tiktok_src||{}).unit==='views'?st(true,'완료'):'<span class="pst none">참고만</span>':'<span class="pst none">자료 없음</span>'}</span></div>`;
     if(lastDone===-2)lastDone=done;   // 방금 불러왔으면 다시 받지 않음
     if(done!==lastDone&&Date.now()-lastLoad>60000){lastDone=done;lastLoad=Date.now();await loadData(false)}   // 수집 중엔 1분에 한 번만 새로 그림
   }catch(e){}}

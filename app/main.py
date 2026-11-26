@@ -450,7 +450,7 @@ def probe_pin(path: str = "metrics/", qs: str = ""):
 
 
 # 틱톡 회사 해시태그 값에 다른 브랜드가 크게 섞이는 키워드(회사의 대표 브랜드가 아님)
-TT_MIXED = {"nintendo switch","pokemon cards","g-shock","hello kitty","kuromi","retatrutide","zepbound","hoka","ugg","arcteryx","salomon","onitsuka tiger","alani nu","rhode"}
+TT_MIXED = set()   # 모두 그대로 씀(사용자 결정)
 
 
 @app.get("/api/probe_ttcc")
