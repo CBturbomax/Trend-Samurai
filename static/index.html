@@ -656,7 +656,7 @@ const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorag
 S.groupBy=ls('kt_group')||'category';S.sortBy=ls('kt_sort')||'score';S.kwq='';S.ks=[];
 function savedHtml(){
   const key='category',order=CATS,f=S.kwq.trim().toLowerCase();
-  const all=[...S.ks].sort((a,b)=>b.score-a.score);
+  const all=[...S.ks].sort((a,b)=>(b.mom??-1)-(a.mom??-1)||b.score-a.score);
   const groups={};all.forEach(k=>{const g=k[key]||'미분류';(groups[g]||(groups[g]=[])).push(k)});
   const names=[...order.filter(g=>groups[g]),...Object.keys(groups).filter(g=>!order.includes(g))];
   if(!S.cat||(S.cat!=='전체'&&!groups[S.cat]))S.cat='전체';
@@ -677,8 +677,8 @@ function savedHtml(){
   return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
    ${f?'':`<div class="kcats"><button class="kcat ${S.cat==='전체'?'on':''}" data-cat="전체">전체<span>${all.length}</span></button>${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
-     const m=k.m||{},tier=k.score>=80?'t1':k.score>=60?'t2':k.score>=40?'t3':'t4';
-     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''}><em>${i+1}</em><div class="kc-m"><span class="kc-n">${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><span class="kc-s">조회 ${m.yt_views==null?'–':fmtS(m.yt_views)} · 영상 ${m.yt_videos==null?'–':fmtS(m.yt_videos)} · 레딧 ${m.reddit_posts==null?'수집 중':fmtS(m.reddit_posts)}</span></div><b class="kc-sc ${tier}">${k.score}</b><i class="kc-bar ${tier}" style="width:${k.score}%"></i></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
+     const sc=k.mom??0,tier=sc>=80?'t1':sc>=60?'t2':sc>=40?'t3':'t4';
+     return `<button class="kcell kwbtn ${on?'on':''}" data-id="${k.id}" ${on?`style="color:${c};border-color:${c}"`:''}><em>${i+1}</em><div class="kc-m"><span class="kc-n">${esc(k.name)}${(S.alertIds||{})[k.id]?'<i class="hi">▲</i>':''}</span><span class="kc-s">${k.near==null?'수집 중':`최고 대비 ${k.near}%`}${k.yoy==null?'':` · 전년 ${k.yoy>0?'+':''}${k.yoy}%`}</span></div><b class="kc-sc ${tier}">${k.mom??'–'}</b><i class="kc-bar ${tier}" style="width:${sc}%"></i></button>`}).join('')||'<span class="dim">없음</span>'}</div>`;
 }
 function renderSaved(){const a=document.activeElement,typing=a&&a.id==='kwFilter',pos=typing?a.selectionStart:0;$('#savedBox').innerHTML=S.ks.length?savedHtml():'';if(typing){const i=$('#kwFilter');i.focus();i.setSelectionRange(pos,pos)}}
 async function loadAlerts(){try{S.alerts=await api('/api/alerts');S.alertIds={};S.alerts.forEach(r=>{if(r.highs)S.alertIds[r.id]=1});renderSaved()}catch(e){}}

@@ -308,7 +308,11 @@ def keywords():
     rank = {n: i for i, n in enumerate(order)}
     for k in ks:
         k["rank"] = rank.get(k["name"], 10 ** 6)
-    return sorted(ks, key=lambda r: (-r["score"], r["name"]))
+    if not _MOM:
+        alerts()
+    for k in ks:
+        k.update(_MOM.get(k["id"]) or {"mom": None, "near": None, "yoy": None})
+    return sorted(ks, key=lambda r: (-(r["mom"] if r["mom"] is not None else -1), -r["score"], r["name"]))
 
 
 class GroupIn(BaseModel):
@@ -684,6 +688,47 @@ def keyword_alerts(d):
     return [a for a in out if a]
 
 
+def _wk_mom(pts):
+    """주간 값 → (최고 대비 %, 전년 대비 %). 4주 평균으로 매끄럽게 한 뒤 최근 4주를 2년 최고·1년 전과 비교."""
+    vals = [v for _, v in sorted(pts.items())]
+    if len(vals) < 60:
+        return None
+    r4 = [sum(vals[i - 3:i + 1]) / 4 for i in range(3, len(vals))]
+    last, mx = r4[-1], max(r4[-104:])
+    if mx <= 0:
+        return None
+    prev = r4[-53] if len(r4) >= 53 else 0
+    return round(last / mx * 100), (round((last / prev - 1) * 100) if prev > 0 else None)
+
+
+def momentum(d):
+    """기세 점수(0~100): 지표마다 0.6×(최근이 2년 최고의 몇 %) + 0.4×(전년 대비: +100%↑=100, 0%=50, −100%=0) → 평균."""
+    series = []
+    for t in d.get("trends_w", []):
+        if t["points"] and (t["gprop"], t["geo"]) in (("web", "WW"), ("youtube", "WW"), ("pinterest", "US")):
+            series.append({k: v[0] for k, v in t["points"].items() if not v[1]})
+    if (d.get("tiktok_src") or {}).get("unit") == "views" and d.get("tiktok_history"):
+        series.append({r["week"]: r["value"] for r in d["tiktok_history"]})
+    sc, nears, yoys = [], [], []
+    for pts in series:
+        m = _wk_mom(pts)
+        if not m:
+            continue
+        near, yoy = m
+        ys = 50 if yoy is None else max(0, min(100, 50 + yoy / 2))
+        sc.append(0.6 * min(100, near) + 0.4 * ys)
+        nears.append(near)
+        if yoy is not None:
+            yoys.append(yoy)
+    if not sc:
+        return {"mom": None, "near": None, "yoy": None, "n": 0}
+    return {"mom": round(sum(sc) / len(sc)), "near": round(sum(nears) / len(nears)),
+            "yoy": round(sum(yoys) / len(yoys)) if yoys else None, "n": len(sc)}
+
+
+_MOM = {}
+
+
 @app.get("/api/alerts")
 def alerts():
     """지표별 신고가(최근 완료 기간이 역대 최고 초과) 또는 근접(최고의 95% 이상) 키워드. 10분 캐시."""
@@ -695,6 +740,7 @@ def alerts():
             d = build(k["id"])
         except Exception:
             continue
+        _MOM[d["id"]] = momentum(d)
         a = keyword_alerts(d)
         if a:
             res.append({"id": d["id"], "keyword": d["keyword"], "category": d["category"], "alerts": a,
