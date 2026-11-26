@@ -509,15 +509,23 @@ function viewReddit(d){   // 전용 커뮤니티가 있으면 '합산' 하나로
   return (d.global&&d.global.enabled?viewGlobal(d):'')+(own&&ment?redditTotal(d):own?viewOwn(d):mentionCharts(d))}
 function viewYT(d){return trendChart(d,'youtube')+viewYoutube(d)}
 function viewTiktok(d){
-  const tags=d.tiktok||[],hist=d.tiktok_history||[];
+  const tags=(d.tiktok||[]).filter(t=>t.rows.length),hist=d.tiktok_history||[];
   const src=d.tiktok_src||{},isV=src.unit==='views';
-  const histChart=hist.length>1?chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,title:isV?`틱톡 · 회사 해시태그 조회수 (주간, 최근 2년) — ${src.label||''}`:'틱톡 · 게시물 활동 지수 (주간, 최근 2년)',
-    desc:isV?'회 · 회사 전체 해시태그 조회수':'상대 지수',
-    foot:'',source:'TickerTrends (TikTok)',series:[{name:isV?'해시태그 조회수':'활동 지수',color:PAL[3],pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]}):'';
-  // 활동 지수(표본 게시물 수)는 2026년 10월부터 수집 방식이 바뀌어 거의 모든 키워드가 같이 튐 → 참고용으로 접어 둠
-  if(isV)return histChart;
-  if(histChart)return `<div class="box dim small warn">신뢰 낮음 · 2026-10부터 집계 기준 변경으로 급등</div>${histChart}`;
-  return '<div class="box dim">틱톡 자료 없음</div>';
+  const tagNames=tags.map(t=>'#'+t.tag).join(' · ');
+  // 키워드 해시태그: 날마다 누적 조회수 → 하루 새 조회수
+  const days={};tags.forEach(t=>t.rows.forEach(r=>{days[r.day]=(days[r.day]||0)+r.views}));
+  const ks=Object.keys(days).sort();let out='';
+  if(!ks.length)out+=`<div class="box dim">키워드 해시태그 수집 중</div>`;
+  else if(ks.length<3)out+=`<div class="box"><b>${esc(tagNames)}</b> 누적 조회수 <b>${fmtS(days[ks[ks.length-1]])}</b> · ${ks[ks.length-1]}<br><span class="dim">매일 기록 중 — 하루 새 조회수 추이는 며칠 뒤부터</span></div>`;
+  else{const inc={};ks.slice(1).forEach((k,i)=>{inc[k]=Math.max(0,days[k]-days[ks[i]])});
+    out+=chart('tt-tag',{daily:true,months:Object.keys(inc),cur:null,title:`틱톡 · ${esc(tagNames)} 하루 새 조회수`,desc:'회/일 · 해시태그 누적 조회수 증가분',source:'',foot:'',
+      series:[{name:'새 조회수',color:PAL[3],pts:inc}]});}
+  // 참고: 회사 전체 해시태그(여러 브랜드 합산) — 2년 이력이 있어 참고용으로만
+  if(hist.length>1)out+=chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,
+    title:isV?`참고 · 회사 전체 해시태그 조회수 — ${src.label||''} (이 키워드만이 아님)`:'참고 · 게시물 활동 지수 (2026-10 집계 기준 변경으로 급등, 신뢰 낮음)',
+    desc:isV?'회 · 회사의 여러 브랜드 합산':'상대 지수',foot:'',source:'',
+    series:[{name:isV?'회사 해시태그 조회수':'활동 지수',color:'#6b7785',pts:Object.fromEntries(hist.map(r=>[r.week,r.value]))}]});
+  return out;
 }
 function viewGoogle(d){return trendChart(d,'web')}
 const PGEO=[['US','미국'],['GB','영국'],['DE','독일'],['FR','프랑스'],['IT','이탈리아'],['ES','스페인']],PGN=Object.fromEntries(PGEO);
@@ -622,14 +630,14 @@ async function pollStatus(){
     // 플랫폼별로 '다 받음 / 받는 중'만 보여 줌
     const bk=s.by_kind||[],pend=kinds=>bk.some(r=>kinds.includes(r.kind)&&['queued','running','hold'].includes(r.status));
     const d=S.data||{},st=(on,txt)=>`<span class="pst ${on?'ok':'ing'}">${on?'✓':'…'} ${txt}</span>`;
-    const tt=d.tiktok_history&&d.tiktok_history.length;
+    const tt=(d.tiktok||[]).some(t=>t.rows.length);
     p.style.display=S.sel.length>1?'none':'';
     p.innerHTML=`<div class="pstat">
       <span class="pchip">${ICO.reddit}레딧 ${st(!pend(['mention','totals','discover']),pend(['mention','totals','discover'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.yt}유튜브 ${st(!pend(['yt','ytstats']),pend(['yt','ytstats'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.google}구글 ${st(!pend(['trends']),pend(['trends'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.pin}핀터레스트 ${(d.trends_w||[]).some(t=>t.gprop==='pinterest'&&Object.keys(t.points).length)?st(true,'완료'):pend(['pin'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span>
-      <span class="pchip">${ICO.tiktok}틱톡 ${tt?st(true,'완료'):'<span class="pst none">자료 없음</span>'}</span></div>`;
+      <span class="pchip">${ICO.tiktok}틱톡 ${tt?st(true,'매일 기록'):pend(['tiktok'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span></div>`;
     if(lastDone===-2)lastDone=done;   // 방금 불러왔으면 다시 받지 않음
     if(done!==lastDone&&Date.now()-lastLoad>60000){lastDone=done;lastLoad=Date.now();await loadData(false)}   // 수집 중엔 1분에 한 번만 새로 그림
   }catch(e){}}

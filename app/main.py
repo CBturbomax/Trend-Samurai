@@ -1,5 +1,6 @@
 import base64
 import calendar
+import datetime as dt
 from datetime import datetime, timezone
 import csv
 import io
@@ -43,7 +44,6 @@ async def lifespan(app):
         x("UPDATE jobs SET priority=? WHERE kind='trends' AND gprop=? AND geo=? AND status IN ('queued','hold')", (pr, g, r))
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
-    x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")
     # 글 언급 기준이 바뀌면(제목만 → 제목+본문) 이전 집계를 지우고 다시 셈
     if (q("SELECT value FROM meta WHERE key='mention_field'") or [{"value": "title"}])[0]["value"] != C.MENTION_FIELD:
         x("DELETE FROM mention_windows WHERE term NOT LIKE 'c:%'")
@@ -650,9 +650,18 @@ def keyword_alerts(d):
         for m, by in ms.items():
             rp[m] = rp.get(m, 0) + sum(by.values())
     out.append(_highs("레딧 글 수", rp, cur))
-    tt = {r["week"]: r["value"] for r in d["tiktok_history"]}
-    if (d.get("tiktok_src") or {}).get("unit") == "views":
-        out.append(_highs("틱톡 조회수", tt, None, 26))
+    # 틱톡: 회사 전체 해시태그 합은 키워드 반응이 아니라 알림에서 뺌. 키워드 해시태그 주간 증가분이 8주 쌓이면 그걸로
+    days = {}
+    for t in d["tiktok"]:
+        for r in t["rows"]:
+            days[r["day"]] = days.get(r["day"], 0) + r["views"]
+    ks = sorted(days)
+    wk = {}
+    for a, b in zip(ks, ks[1:]):
+        w = (dt.date.fromisoformat(b) - dt.timedelta(days=dt.date.fromisoformat(b).weekday())).isoformat()
+        wk[w] = wk.get(w, 0) + max(0, days[b] - days[a])
+    if len(wk) >= 9:
+        out.append(_highs("틱톡 조회수", dict(sorted(wk.items())[:-1]), None, 8))
     return [a for a in out if a]
 
 
