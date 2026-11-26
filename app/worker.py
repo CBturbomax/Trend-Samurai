@@ -103,6 +103,10 @@ def enqueue_keyword(kid, refresh=False):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
         if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
             _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
+    # 구글 쇼핑 검색(전세계, 주간): 구매 의도에 가까운 검색
+    wk2 = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
+    if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop='froogle' AND geo='WW' AND updated_at>? LIMIT 1", (kid, wk2)):
+        _add(kid, "trends", 2, gprop="froogle", geo="WW", month="W")
     # 일본 브랜드: 일본에서 일본어로 검색한 구글·유튜브 주간(6일 안에 받은 게 없으면)
     if q("SELECT 1 FROM meta WHERE key=?", (f"ja:{kid}",)):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")

@@ -468,6 +468,25 @@ def probe_pin(path: str = "metrics/", qs: str = ""):
 TT_MIXED = set()   # 모두 그대로 씀(사용자 결정)
 
 
+@app.get("/api/probe_amz")
+def probe_amz(asin: str = "B0DY11WJ3R", host: str = "www.amazon.com"):
+    """아마존 상품 페이지의 '지난달 구매' 표시가 서버에서 받아지는지 확인(공개 페이지, 한 번)."""
+    import re as _re
+    import requests as rq
+    if host not in ("www.amazon.com", "www.amazon.co.jp"):
+        raise HTTPException(400, "host")
+    try:
+        r = rq.get(f"https://{host}/dp/{asin}", headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"}, timeout=25)
+        t = r.text
+        return {"code": r.status_code, "len": len(t), "captcha": "captcha" in t.lower(),
+                "bought": _re.findall(r"([0-9][0-9.,]*[KkMm]?\+?)\s*bought in past month", t)[:3],
+                "title": (_re.search(r'id="productTitle"[^>]*>\s*([^<]{0,120})', t) or [None, None])[1]}
+    except Exception as e:
+        return {"err": type(e).__name__}
+
+
 @app.get("/api/probe_ttcc")
 def probe_ttcc(tag: str = "medicube", period: int = 1095, country: str = "US"):
     """틱톡 크리에이티브 센터 해시태그 추이가 서버에서 받아지는지 확인."""
@@ -624,7 +643,7 @@ def build(kid: int):
         "ja": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ja:{kid}",)) or [{"value": "null"}])[0]["value"]),
         "trends_w": [{"gprop": g, "geo": geo, "points": {r["week"]: [r["value"], r["partial"]] for r in q(
             "SELECT week,value,partial FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? ORDER BY week", (kid, g, geo))}}
-            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("web", "JA"), ("web", "JP"), ("youtube", "JP"), *(("pinterest", c) for c in worker.PIN_GEOS))],
+            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("web", "JA"), ("web", "JP"), ("youtube", "JP"), ("froogle", "WW"), *(("pinterest", c) for c in worker.PIN_GEOS))],
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
             "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
