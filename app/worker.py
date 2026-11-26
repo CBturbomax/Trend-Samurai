@@ -604,12 +604,20 @@ def _ytw(fn, *a):
     try:
         r = fn(*a)
         autotune.record("youtube", True)
+        state["yt_streak"], state["yt_pauses"] = 0, 0
         return r
     except Exception as e:
         autotune.record("youtube", False)
         errs = state.setdefault("yt_errs", {})
         k = str(e)[:60]
         errs[k] = errs.get(k, 0) + 1
+        # 연달아 막히면(403) 계속 두드리지 말고 쉼: 1시간 → 2 → 4 → 최대 6시간. 쉬는 동안엔 공식 API 키가 있으면 그걸로
+        state["yt_streak"] = state.get("yt_streak", 0) + 1
+        if state["yt_streak"] >= 8:
+            n = state.get("yt_pauses", 0)
+            autotune.PAUSE["youtube"] = time.time() + min(6, 2 ** n) * 3600
+            autotune.note(f"유튜브가 계속 막음(403) → {min(6, 2 ** n)}시간 쉬고 다시 시도")
+            state["yt_pauses"], state["yt_streak"] = n + 1, 0
         raise
     finally:
         state["ytw_next"] = time.time() + C.YT_WEB_GAP
@@ -688,7 +696,12 @@ def _snapshot(kid):
 
 def do_yt(job):
     kid, key = job["keyword_id"], yt_key()
-    if not key:
+    # 기본은 키 없는 방식. 그게 막혀 쉬는 동안에만 공식 API(무료 한도)로 대신 받음
+    paused = autotune.PAUSE.get("youtube", 0) > time.time()
+    if not key or not paused or state.get("yt_api_out", 0) > time.time():
+        if paused:   # 쉬는 중인데 대신할 키도 없음 → 쉬는 시간 끝난 뒤로 미룸
+            x("UPDATE jobs SET next_at=? WHERE kind='yt' AND status='queued' AND next_at<?", (autotune.PAUSE["youtube"],) * 2)
+            return _set(job, "queued", "유튜브가 막아 쉬는 중", autotune.PAUSE["youtube"])
         return do_yt_web(job)
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     a, b = dt.date.fromisoformat(job["start"]), dt.date.fromisoformat(job["end"])
@@ -712,7 +725,10 @@ def do_yt(job):
                 break
         ids = list(dict.fromkeys(ids))
         kept = _yt_store(kid, key, ids, terms)
-    except (youtube.QuotaExceeded, youtube.KeyInvalid, youtube.YTError) as e:
+    except youtube.QuotaExceeded:   # 공식 API 하루 한도 소진 → 그날은 키 없는 방식만
+        state["yt_api_out"] = time.time() + 6 * 3600
+        return _set(job, "queued", "API 하루 한도 소진", time.time() + 60)
+    except (youtube.KeyInvalid, youtube.YTError) as e:
         return _yt_fail(job, e)
     x("INSERT OR REPLACE INTO yt_windows VALUES(?,?,?,?,?,?,?)",
       (kid, job["start"], job["end"], "done" if today() >= b else "open", kept, capped, now_iso()))
