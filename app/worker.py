@@ -381,7 +381,7 @@ def do_mention(job):
         if days > 400 and tries >= 8:   # 실패는 대부분 아카이브 부하(같은 요청도 됐다 안 됐다) → 쪼개면 요청만 늘어남. 계속 실패할 때만 해 단위로
             _split_years(job)
             return _set(job, "done", f"{e} → 해 단위로 나눔")
-        if days > 40 and tries >= 8:   # 긴 창이 계속 시간 초과 → 달 단위로
+        if days > 40 and tries >= 2:   # 긴 창이 두 번 시간 초과 → 바로 달 단위로(무거운 검색 하나가 전체를 붙잡지 않게)
             for m in reversed([m for m in all_months() if job["start"][:7] <= m < job["end"][:7]] or [job["start"][:7]]):
                 _add(job["keyword_id"], "mention", 5 if job["term"].startswith(CPFX) else 3, sub=sub, term=job["term"],
                      month=m, start=month_bounds(m)[0], end=month_bounds(m)[1])
