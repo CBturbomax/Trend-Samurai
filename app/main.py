@@ -669,6 +669,10 @@ def keyword_alerts(d):
                 for m, (v, _p) in t["points"].items():
                     s[m] = s.get(m, 0) + v
         out.append(_highs(label, s, cur))
+    jw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "web" and t["geo"] == "JA" and t["points"]), None)
+    if jw:   # 일본 브랜드: 일본어 검색(주간) 최근 2년 최고 대비
+        done = {k: v[0] for k, v in sorted(jw.items()) if not v[1]}
+        out.append(_highs("일본어 검색", {k: done[k] for k in sorted(done)[-104:]}, None, 26))
     pw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "pinterest" and t["geo"] == "US" and t["points"]), None)
     if pw:   # 핀터레스트 주간(미국, 최근 2년): 마지막 주가 지난 최고를 넘었나
         out.append(_highs("핀터레스트 검색", {k: v[0] for k, v in sorted(pw.items())}, None, 26))

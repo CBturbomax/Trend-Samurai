@@ -673,9 +673,9 @@ function savedHtml(){
   const list=f?all.filter(k=>k.name.includes(f)):S.cat==='전체'?all:groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
-  const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수','핀터레스트 검색'];
-  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'},'핀터레스트 검색':{c:'#E60023',i:ICO.pin,t:'검색'}};
-  const MT={'구글 검색':'google','유튜브 검색':'yt','레딧 글 수':'reddit','틱톡 조회수':'tiktok','핀터레스트 검색':'pin'};
+  const MET=['구글 검색','일본어 검색','유튜브 검색','레딧 글 수','틱톡 조회수','핀터레스트 검색'];
+  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'},'핀터레스트 검색':{c:'#E60023',i:ICO.pin,t:'검색'},'일본어 검색':{c:'#BC002D',i:ICO.google,t:'日本'}};
+  const MT={'일본어 검색':'google-ja','구글 검색':'google','유튜브 검색':'yt','레딧 글 수':'reddit','틱톡 조회수':'tiktok','핀터레스트 검색':'pin'};
   const cell=(a,m)=>!a?'<td class="mx-n">·</td>':a.kind==='high'?`<td class="mx-h" data-t="${MT[m]}">신고가</td>`:`<td class="mx-p" data-t="${MT[m]}">${a.pct}%</td>`;
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
    <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
@@ -730,7 +730,7 @@ const vals=sel=>[...document.querySelectorAll(sel+':checked')].map(x=>x.value);
 document.addEventListener('click',async e=>{
   // 신고가 모니터: 그 키워드 하나만 골라 해당 플랫폼 차트로 이동(누른 칸의 플랫폼, 아니면 신고가 난 플랫폼)
   const row=e.target.closest('tr.mxrow');
-  if(row){const td=e.target.closest('td[data-t]');S.tab=(td||row).dataset.t;S.sel=[];await select(+row.dataset.id);
+  if(row){const td=e.target.closest('td[data-t]');S.tab=(td||row).dataset.t;if(S.tab==='google-ja'){S.tab='google';S.geo='JA'}else if(S.geo==='JA')S.geo='WW';S.sel=[];await select(+row.dataset.id);
     const r=$('#result');if(r)window.scrollTo({top:r.getBoundingClientRect().top+scrollY-8,behavior:'smooth'});return}
   const t=e.target.closest('button')||e.target;   // 버튼 안의 글자·아이콘을 눌러도 버튼으로 인식
   if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='reddit';select(r.id)}
