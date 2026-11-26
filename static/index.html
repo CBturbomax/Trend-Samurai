@@ -301,9 +301,9 @@ function chart(id,o){
   // 합산 차트: part 계열은 선으로 그리지 않고, 범례에서 켜진 것만 합계에 더함
   const parts=o.series.filter(s=>s.part),inc=parts.filter(s=>!hid.has(s.name));
   // 합계: 포함한 커뮤니티 중 하나라도 아직 안 받은 달은 빼고 그림(덜 받은 달을 더하면 가짜로 튀거나 꺼짐)
-  o.series.forEach(s=>{if(s.isTotal){const pts={};o.months.forEach(m=>{if(m===o.cur)return;
+  o.series.forEach(s=>{if(s.isTotal){const pts={},dim={};s.dim=dim;o.months.forEach(m=>{if(m===o.cur)return;
     const miss=inc.some(p=>{if(p.pts[m]!=null)return false;const st=p.from||Object.keys(p.pts).sort()[0];return st&&m>=st});
-    const v=inc.map(p=>p.pts[m]).filter(x=>x!=null);if(v.length&&!miss)pts[m]=v.reduce((a,b)=>a+b,0)});
+    const v=inc.map(p=>p.pts[m]).filter(x=>x!=null);if(v.length){pts[m]=v.reduce((a,b)=>a+b,0);if(miss)dim[m]=1}});
     if(o.cur){const v=inc.map(p=>p.pts[o.cur]).filter(x=>x!=null);if(v.length&&!inc.some(p=>p.pts[o.cur]==null&&Object.keys(p.pts).length))pts[o.cur]=v.reduce((a,b)=>a+b,0)}
     s.pts=pts}});
   const series=o.series.filter(s=>!s.part&&!hid.has(s.name));
@@ -341,13 +341,16 @@ function lineSvg(id,months,series,o){
     if(t)g+=`<text x="${X(i)}" y="${H-B+f+8}" text-anchor="middle" fill="${first?'#c5cdd6':'#7d8996'}" font-size="${f}">${t}</text>`+(first&&i?`<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T+ph}" stroke="#fff" stroke-opacity=".06"/>`:'')});
   const ends=[];
   series.forEach((s,k)=>{let d='',pen=false,first=null,last=null;const segs=[];
-    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){pen=false;return}const p=X(i).toFixed(1)+' '+Yv(v).toFixed(1);d+=(pen?'L':'M')+p;
+    const dm=s.dim||{};let dd='',dpen=false,prevI=null;
+    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci){dpen=false;return}const p=X(i).toFixed(1)+' '+Yv(v).toFixed(1);dd+=(dpen?'L':'M')+p;dpen=true});
+    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci||dm[m]){pen=false;return}const p=X(i).toFixed(1)+' '+Yv(v).toFixed(1);d+=(pen?'L':'M')+p;
       if(pen){const g2=segs[segs.length-1];g2.d+='L'+p;g2.b=i}else segs.push({d:'M'+p,a:i,b:i});pen=true;if(first==null)first=i;last=i});
-    if(!d)return;
+    if(Object.keys(dm).length&&dd)g+=`<path d="${dd}" fill="none" stroke="${s.color}" stroke-width="1.6" stroke-dasharray="4 4" stroke-opacity=".55"/>`;   // 덜 받은 달 포함 전체는 점선
+    if(!d&&!dd)return;
     if(series.length===1)segs.forEach(sg=>{g+=`<path d="${sg.d}L${X(sg.b).toFixed(1)} ${T+ph}L${X(sg.a).toFixed(1)} ${T+ph}Z" fill="url(#gr-${id}-${k})"/>`});   // 빈 구간은 채우지 않음
     g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.bold||s.isTotal||series.length===1?2.4:1.8}" stroke-linejoin="round" stroke-linecap="round"/>`;
     if(ci>0&&s.pts[o.cur]!=null&&s.pts[months[ci-1]]!=null)g+=`<line x1="${X(ci-1)}" y1="${Yv(s.pts[months[ci-1]])}" x2="${X(ci)}" y2="${Yv(s.pts[o.cur])}" stroke="${s.color}" stroke-width="1.6" stroke-dasharray="3 4" stroke-opacity=".7"/>`;
-    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci)return;g+=`<circle cx="${X(i)}" cy="${Yv(v)}" r="${i===last?4:n>60?1.8:2.6}" fill="${s.color}" stroke="#11171d" stroke-width="1"/>`});
+    months.forEach((m,i)=>{const v=s.pts[m];if(v==null||i===ci)return;g+=dm[m]?`<circle cx="${X(i)}" cy="${Yv(v)}" r="${n>60?1.8:2.6}" fill="#11171d" stroke="${s.color}" stroke-width="1.2"/>`:`<circle cx="${X(i)}" cy="${Yv(v)}" r="${i===last?4:n>60?1.8:2.6}" fill="${s.color}" stroke="#11171d" stroke-width="1"/>`});
     if(last!=null)ends.push(last)});
   // 점마다 값: 최근 12개 + 연말 + 마지막 점. 겹치면 위→아래→더 위 순으로 피하고 자리가 없으면 생략
   const boxes=[],hit=(a,b)=>a[0]<b[0]+b[2]&&b[0]<a[0]+a[2]&&a[1]<b[1]+b[3]&&b[1]<a[1]+a[3],cw=f*.62;
