@@ -505,8 +505,8 @@ function viewMention(d){return mentionCharts(d)}
 function redditTotal(d){
   if(!Object.keys(d.own).length)return '';   // 전용 커뮤니티가 없으면 아래 언급 합계와 같으므로 생략
   const o={months:d.months,cur:d.cur_month,source:'arctic-shift (레딧 아카이브)',foot:''};
-  const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용·전체)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
-  const mk=(id,i,key,what)=>{const l=[...own(i),...(i?[]:mentionParts(d,key).map(x=>({...x,from:'2023-01',name:x.name+' (언급)'})))];if(!l.length)return '';
+  const own=i=>Object.entries(d.own).map(([sub,ms],k)=>({name:'r/'+sub+' (전용레딧)',color:PAL[(k+4)%PAL.length],pts:Object.fromEntries(Object.entries(ms).map(([m,v])=>[m,v[i]]))}));
+  const mk=(id,i,key,what)=>{const l=[...own(i),...(i?[]:mentionParts(d,key).map(x=>({...x,from:'2023-01',name:x.name})))];if(!l.length)return '';
     return chart(id,{...o,title:i?'레딧 · 전용 커뮤니티 댓글 수':`레딧 · 주요 커뮤니티 ${l.length}곳 ${what} 수`,desc:'개/월',series:totalOf('레딧 합계',l)})};
   return mk('rt-p',0,'mentions','글')+mk('rt-c',1,'mentions_c','댓글');
 }
