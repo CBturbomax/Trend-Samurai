@@ -43,6 +43,7 @@ async def lifespan(app):
     for (g, r), pr in worker.TREND_PRIO.items():
         x("UPDATE jobs SET priority=? WHERE kind='trends' AND gprop=? AND geo=? AND status IN ('queued','hold')", (pr, g, r))
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
+    x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")   # 매일 누적 기록은 안 함
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     # 글 언급 기준이 바뀌면(제목만 → 제목+본문) 이전 집계를 지우고 다시 셈
     if (q("SELECT value FROM meta WHERE key='mention_field'") or [{"value": "title"}])[0]["value"] != C.MENTION_FIELD:
@@ -446,6 +447,16 @@ def probe_pin(path: str = "metrics/", qs: str = ""):
         return {"url": u, "code": r.status_code, "ct": r.headers.get("content-type"), "body": r.text[:3000]}
     except Exception as e:
         return {"url": u, "err": type(e).__name__}
+
+
+@app.get("/api/probe_ttcc")
+def probe_ttcc(tag: str = "medicube", period: int = 1095, country: str = "US"):
+    """틱톡 크리에이티브 센터 해시태그 추이가 서버에서 받아지는지 확인."""
+    from .sources import tiktok as tk
+    try:
+        return tk.creative_center(tag, period, country)
+    except Exception as e:
+        return {"err": f"{type(e).__name__}: {e}"[:300]}
 
 
 @app.get("/api/health")

@@ -512,14 +512,7 @@ function viewTiktok(d){
   const tags=(d.tiktok||[]).filter(t=>t.rows.length),hist=d.tiktok_history||[];
   const src=d.tiktok_src||{},isV=src.unit==='views';
   const tagNames=tags.map(t=>'#'+t.tag).join(' · ');
-  // 키워드 해시태그: 날마다 누적 조회수 → 하루 새 조회수
-  const days={};tags.forEach(t=>t.rows.forEach(r=>{days[r.day]=(days[r.day]||0)+r.views}));
-  const ks=Object.keys(days).sort();let out='';
-  if(!ks.length)out+=`<div class="box dim">키워드 해시태그 수집 중</div>`;
-  else if(ks.length<3)out+=`<div class="box"><b>${esc(tagNames)}</b> 누적 조회수 <b>${fmtS(days[ks[ks.length-1]])}</b> · ${ks[ks.length-1]}<br><span class="dim">매일 기록 중 — 하루 새 조회수 추이는 며칠 뒤부터</span></div>`;
-  else{const inc={};ks.slice(1).forEach((k,i)=>{inc[k]=Math.max(0,days[k]-days[ks[i]])});
-    out+=chart('tt-tag',{daily:true,months:Object.keys(inc),cur:null,title:`틱톡 · ${esc(tagNames)} 하루 새 조회수`,desc:'회/일 · 해시태그 누적 조회수 증가분',source:'',foot:'',
-      series:[{name:'새 조회수',color:PAL[3],pts:inc}]});}
+  let out=`<div class="box dim">키워드 해시태그 과거 추이 준비 중</div>`;
   // 참고: 회사 전체 해시태그(여러 브랜드 합산) — 2년 이력이 있어 참고용으로만
   if(hist.length>1)out+=chart('tt-hist',{daily:true,months:hist.map(r=>r.week),cur:null,
     title:isV?`참고 · 회사 전체 해시태그 조회수 — ${src.label||''} (이 키워드만이 아님)`:'참고 · 게시물 활동 지수 (2026-10 집계 기준 변경으로 급등, 신뢰 낮음)',
@@ -637,7 +630,7 @@ async function pollStatus(){
       <span class="pchip">${ICO.yt}유튜브 ${st(!pend(['yt','ytstats']),pend(['yt','ytstats'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.google}구글 ${st(!pend(['trends']),pend(['trends'])?'받는 중':'완료')}</span>
       <span class="pchip">${ICO.pin}핀터레스트 ${(d.trends_w||[]).some(t=>t.gprop==='pinterest'&&Object.keys(t.points).length)?st(true,'완료'):pend(['pin'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span>
-      <span class="pchip">${ICO.tiktok}틱톡 ${tt?st(true,'매일 기록'):pend(['tiktok'])?st(false,'받는 중'):'<span class="pst none">자료 없음</span>'}</span></div>`;
+      <span class="pchip">${ICO.tiktok}틱톡 <span class="pst ing">준비 중</span></span></div>`;
     if(lastDone===-2)lastDone=done;   // 방금 불러왔으면 다시 받지 않음
     if(done!==lastDone&&Date.now()-lastLoad>60000){lastDone=done;lastLoad=Date.now();await loadData(false)}   // 수집 중엔 1분에 한 번만 새로 그림
   }catch(e){}}

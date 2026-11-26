@@ -56,3 +56,29 @@ def hashtag_stats(tags):
     except Exception as e:
         raise TikTokError(f"브라우저 실행 실패: {type(e).__name__}: {str(e)[:100]}")
     return out
+
+
+def creative_center(tag, period=1095, country="US"):
+    """틱톡 크리에이티브 센터(공개 페이지)의 해시태그 인기 추이. 페이지가 스스로 받는 응답을 그대로 읽음."""
+    from playwright.sync_api import sync_playwright
+    url = f"https://ads.tiktok.com/business/creativecenter/hashtag/{tag}/pc/en?countryCode={country}&period={period}"
+    got = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(executable_path=os.environ.get("KT_CHROMIUM") or None,
+                                    args=["--no-sandbox", "--disable-dev-shm-usage"])
+        ctx = browser.new_context(user_agent=UA, locale="en-US", viewport={"width": 1280, "height": 900})
+        page = ctx.new_page()
+        page.on("response", lambda r: got.append(r) if "creative_radar_api" in r.url else None)
+        try:
+            page.goto(url, wait_until="networkidle", timeout=60000)
+        except Exception:
+            pass
+        out = []
+        for r in got:
+            try:
+                out.append({"url": r.url[:300], "status": r.status, "body": r.text()[:4000]})
+            except Exception as e:
+                out.append({"url": r.url[:300], "err": type(e).__name__})
+        title = page.title()
+        browser.close()
+    return {"page": url, "title": title, "responses": out}

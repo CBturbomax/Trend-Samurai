@@ -102,9 +102,6 @@ def enqueue_keyword(kid, refresh=False):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
         if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
             _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
-    # 틱톡: 키워드 해시태그(#medicube 등) 누적 조회수를 하루 한 번 기록 → 차이 = 그날 새 조회수
-    if not q("SELECT 1 FROM tt_snapshots WHERE keyword_id=? AND day=? LIMIT 1", (kid, today().isoformat())):
-        _add(kid, "tiktok", 3)
     # 핀터레스트 주간(나라별, 최근 2년): 6일 안에 받은 게 없으면 다시(미국 먼저)
     wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
     for i, cc in enumerate(PIN_GEOS):
