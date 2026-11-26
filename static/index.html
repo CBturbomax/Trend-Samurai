@@ -397,11 +397,11 @@ function trendChart(d,gprop){
   if(w&&Object.keys(w.points).length){   // 주간 값이 있으면 주간으로
     let weeks=Object.keys(w.points).sort();const n=S.range==='1y'?53:S.range==='3y'?157:weeks.length;weeks=weeks.slice(-n);
     const cur=weeks.find(k=>w.points[k][1])||null;
-    return chart(`trendw-${gprop}-${S.geo}`,{daily:true,months:weeks,cur,title:S.geo==='JA'?`구글 · 일본어 검색 「${esc(jaName(d))}」 (주간)`:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]}, 주간)`,desc:'지수 0~100',
+    return chart(`trendw-${gprop}-${S.geo}`,{daily:true,months:weeks,cur,title:S.geo==='JA'?`구글 · 일본어 검색 「${esc(jaName(d))}」 (주간)`:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]}, 주간)`,desc:'',
       series:[{name:'검색 관심도',color:PAL[0],pts:Object.fromEntries(weeks.map(k=>[k,w.points[k][0]]))}],source:''});
   }
   return chart(`trend-${gprop}-${S.geo}`,{months:d.months,cur:d.cur_month,title:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]})`,
-    desc:'지수 0~100',
+    desc:'',
     series:trendSeries(d,gprop,S.geo),source:'Google Trends (비공식)',foot:''});
 }
 
@@ -530,11 +530,11 @@ function viewPin(d){
   let out=pinSel();
   if(!p)out+=`<div class="box dim">핀터레스트 자료 없음 (${PGN[S.pgeo]})</div>`;
   else{const weeks=cut(Object.keys(p).sort());
-    out+=chart('pin-w-'+S.pgeo,{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'지수 0~100',source:'',foot:'',
+    out+=chart('pin-w-'+S.pgeo,{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'',source:'',foot:'',
       series:[{name:'검색 관심도',color:'#E60023',pts:Object.fromEntries(weeks.map(k=>[k,p[k][0]]))}]});}
   const have=PGEO.filter(([c])=>pinW(d,c));
   if(have.length>1){const weeks=cut([...new Set(have.flatMap(([c])=>Object.keys(pinW(d,c))))].sort());
-    out+=chart('pin-geo',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 나라별 (주간)',desc:'나라마다 따로 0~100 · 모양만 비교',source:'',foot:'',
+    out+=chart('pin-geo',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 나라별 (주간)',desc:'',source:'',foot:'',
       series:have.map(([c,n])=>({name:n,color:PGC[c],pts:Object.fromEntries(Object.entries(pinW(d,c)).map(([k,v])=>[k,v[0]]))}))});}
   return out;
 }
@@ -555,16 +555,16 @@ function viewCompare(){
     +chart('cmp-yv',{...o,title:'유튜브 · 조회수 합 (올라온 달 기준)',desc:'회',source:'YouTube',series:mk(d=>ytSeries(d,1,'',PAL[0]).pts)});
   if(S.tab==='google'&&S.geo==='JA'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='web'&&t.geo==='JA');const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
     const ser=ds.filter(d=>pw(d)&&Object.keys(pw(d).points).length).map(d=>({name:`${d.keyword} · ${jaName(d)}`,color:kcol(d.id),pts:Object.fromEntries(Object.entries(pw(d).points).map(([k,v])=>[k,v[0]]))}));
-    return ser.length?chart('cmp-ja',{daily:true,months:weeks,cur:null,title:'구글 · 일본어 검색 (주간)',desc:'키워드마다 따로 0~100',source:'',foot:'',series:ser}):'<div class="box dim">일본어 검색 자료 없음</div>';}
+    return ser.length?chart('cmp-ja',{daily:true,months:weeks,cur:null,title:'구글 · 일본어 검색 (주간)',desc:'',source:'',foot:'',series:ser}):'<div class="box dim">일본어 검색 자료 없음</div>';}
   if(S.tab==='google'){const g=(gp)=>mk(d=>{const s=trendMain(d,gp,S.geo);return s?s.pts:{}});
-    return chart('cmp-gw',{...o,title:`구글 · 검색 관심도 (${GEO[S.geo]})`,desc:'키워드마다 따로 0~100',source:'Google Trends',series:g('web')})
-     +chart('cmp-gy',{...o,title:`유튜브 검색 관심도 (${GEO[S.geo]})`,desc:'키워드마다 따로 0~100',source:'Google Trends',series:g('youtube')});}
+    return chart('cmp-gw',{...o,title:`구글 · 검색 관심도 (${GEO[S.geo]})`,desc:'',source:'Google Trends',series:g('web')})
+     +chart('cmp-gy',{...o,title:`유튜브 검색 관심도 (${GEO[S.geo]})`,desc:'',source:'Google Trends',series:g('youtube')});}
   if(S.tab==='tiktok'){const weeks=[...new Set(ds.flatMap(d=>(d.tiktok_history||[]).map(r=>r.week)))].sort();
     const ser=ds.filter(d=>(d.tiktok_history||[]).length).map(d=>{const h=d.tiktok_history,mx=Math.max(...h.map(r=>r.value))||1;return{name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(h.map(r=>[r.week,Math.round(r.value/mx*1000)/10]))}});
-    return ser.length?chart('cmp-tt',{daily:true,months:weeks,cur:null,title:'틱톡 · 주간 추이',desc:'키워드마다 최고=100',source:'TickerTrends',foot:'',series:ser}):'<div class="box dim">틱톡 자료 없음</div>';}
+    return ser.length?chart('cmp-tt',{daily:true,months:weeks,cur:null,title:'틱톡 · 주간 추이',desc:'',source:'TickerTrends',foot:'',series:ser}):'<div class="box dim">틱톡 자료 없음</div>';}
   if(S.tab==='pin'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='pinterest'&&t.geo===S.pgeo);const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
     const ser=ds.filter(d=>pw(d)&&Object.keys(pw(d).points).length).map(d=>({name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(Object.entries(pw(d).points).map(([k,v])=>[k,v[0]]))}));
-    return pinSel()+(ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'키워드마다 따로 0~100',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>');}
+    return pinSel()+(ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>');}
   return '<div class="box dim">요약표는 키워드 하나씩</div>';
 }
 const ICO={
