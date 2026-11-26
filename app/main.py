@@ -210,6 +210,27 @@ def add_own_subs(kid: int, body: SubsIn):
     return {"ok": True}
 
 
+class BoostIn(BaseModel):
+    sub: str
+
+
+@app.post("/api/keywords/{kid}/boost_sub")
+def boost_sub(kid: int, body: BoostIn):
+    """한 커뮤니티의 빈 달을 달 단위 작업으로 맨 앞에 세움(급히 채울 때)."""
+    sub = _clean_sub(body.sub)
+    d = build(kid)
+    have = (d.get("mentions") or {}).get(sub, {})
+    months = [m for m in d["months"] if m >= C.MENTION_POST_START and m not in have]
+    x("UPDATE jobs SET priority=-20, tries=0, next_at=0 WHERE keyword_id=? AND kind='mention' AND sub=? AND status IN ('queued','hold')", (kid, sub))
+    n = 0
+    for t in worker.reddit_terms(kid):
+        for m in months:
+            a, b = worker.month_bounds(m)
+            worker._add(kid, "mention", -20, sub=sub, term=t, month=m, start=a, end=b)
+            n += 1
+    return {"ok": True, "months": months, "jobs": n}
+
+
 @app.post("/api/keywords/{kid}/reddit_terms")
 def set_reddit_terms(kid: int, body: SubsIn):
     """레딧 언급 검색에만 쓰는 추가 검색어(예: rhode)."""
