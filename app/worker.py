@@ -388,8 +388,8 @@ def do_mention(job):
             return _set(job, "done", f"{e} → 달 단위로 나눔")
         if job["term"].startswith(CPFX) and tries >= 6:   # 댓글은 오래 붙잡지 말고 보류 → 다른 달 먼저
             return _set(job, "hold", f"{e} · {tries}회 실패, 나중에 재시도", time.time() + 3600, tries)
-        if tries < C.TRIES_BEFORE_SHRINK:
-            return _set(job, "queued", f"{e} · 재시도 {tries}회", 0, tries)
+        if tries < C.TRIES_BEFORE_SHRINK:   # 바로 다시 하면 같은 무거운 작업이 줄 맨 앞을 계속 차지 → 실패할수록 조금씩 뒤로
+            return _set(job, "queued", f"{e} · 재시도 {tries}회", time.time() + min(1800, 60 * 2 ** tries), tries)
         if days > 300:   # 해 단위가 계속 실패 → 달 단위로
             for m in reversed([m for m in all_months() if m[:4] == job["start"][:4]]):
                 _add(job["keyword_id"], "mention", 3, sub=sub, term=job["term"], month=m,
