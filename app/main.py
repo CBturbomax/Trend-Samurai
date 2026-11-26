@@ -624,7 +624,7 @@ def build(kid: int):
         "ja": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ja:{kid}",)) or [{"value": "null"}])[0]["value"]),
         "trends_w": [{"gprop": g, "geo": geo, "points": {r["week"]: [r["value"], r["partial"]] for r in q(
             "SELECT week,value,partial FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? ORDER BY week", (kid, g, geo))}}
-            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("web", "JA"), *(("pinterest", c) for c in worker.PIN_GEOS))],
+            for g, geo in (("web", "WW"), ("youtube", "WW"), ("web", "US"), ("youtube", "US"), ("web", "JA"), ("web", "JP"), ("youtube", "JP"), *(("pinterest", c) for c in worker.PIN_GEOS))],
         "subs": [dict(s) for s in subs],
         "candidates": [dict(r) for r in q(
             "SELECT name,score,hits FROM candidates WHERE keyword_id=? ORDER BY IFNULL(hits,0) DESC, score DESC", (kid,))],
@@ -656,12 +656,18 @@ def _highs(name, pts, cur, min_n=12):
 def keyword_alerts(d):
     cur = d["cur_month"]
     out = []
+    tw = {(t["gprop"], t["geo"]): t["points"] for t in d.get("trends_w", []) if t["points"]}
     for gp, label in (("web", "구글 검색"), ("youtube", "유튜브 검색")):
-        w = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == gp and t["geo"] == "WW" and t["points"]), None)
-        if w:   # 주간: 마지막 완료 주가 최근 2년(104주) 최고를 넘었나
-            done = {k: v[0] for k, v in sorted(w.items()) if not v[1]}
-            ks_ = sorted(done)[-104:]
-            out.append(_highs(label, {k: done[k] for k in ks_}, None, 26))
+        w = tw.get((gp, "WW"))
+        if w:   # 주간: 마지막 완료 주가 최근 2년(104주) 최고를 넘었나. 일본 브랜드는 일본(일본어 검색)도 보고 더 강한 쪽
+            cands = []
+            for pts in (w, tw.get((gp, "JP")) or (tw.get(("web", "JA")) if gp == "web" else None)):
+                if pts:
+                    done = {k: v[0] for k, v in sorted(pts.items()) if not v[1]}
+                    cands.append(_highs(label, {k: done[k] for k in sorted(done)[-104:]}, None, 26))
+            cands = [c for c in cands if c]
+            if cands:
+                out.append(max(cands, key=lambda c: (c["kind"] == "high", c["pct"])))
             continue
         s = {}
         for t in d["trends"]:
@@ -669,10 +675,6 @@ def keyword_alerts(d):
                 for m, (v, _p) in t["points"].items():
                     s[m] = s.get(m, 0) + v
         out.append(_highs(label, s, cur))
-    jw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "web" and t["geo"] == "JA" and t["points"]), None)
-    if jw:   # 일본 브랜드: 일본어 검색(주간) 최근 2년 최고 대비
-        done = {k: v[0] for k, v in sorted(jw.items()) if not v[1]}
-        out.append(_highs("일본어 검색", {k: done[k] for k in sorted(done)[-104:]}, None, 26))
     pw = next((t["points"] for t in d.get("trends_w", []) if t["gprop"] == "pinterest" and t["geo"] == "US" and t["points"]), None)
     if pw:   # 핀터레스트 주간(미국, 최근 2년): 마지막 주가 지난 최고를 넘었나
         out.append(_highs("핀터레스트 검색", {k: v[0] for k, v in sorted(pw.items())}, None, 26))
@@ -709,8 +711,12 @@ def momentum(d):
     """기세 점수(0~100): 구글·유튜브 검색, 핀터레스트(미국), 틱톡, 일본 브랜드는 일본어 검색까지. 지표마다 0.6×(최근이 2년 최고의 몇 %) + 0.4×(전년 대비: +100%↑=100, 0%=50, −100%=0) → 평균."""
     series = []
     for t in d.get("trends_w", []):
-        if t["points"] and (t["gprop"], t["geo"]) in (("web", "WW"), ("youtube", "WW"), ("pinterest", "US"), ("web", "JA")):
+        if t["points"] and (t["gprop"], t["geo"]) in (("web", "WW"), ("youtube", "WW"), ("pinterest", "US"), ("web", "JP"), ("youtube", "JP")):
             series.append({k: v[0] for k, v in t["points"].items() if not v[1]})
+    if not any(t["gprop"] == "web" and t["geo"] == "JP" and t["points"] for t in d.get("trends_w", [])):
+        ja = next((t for t in d.get("trends_w", []) if t["gprop"] == "web" and t["geo"] == "JA" and t["points"]), None)
+        if ja:
+            series.append({k: v[0] for k, v in ja["points"].items() if not v[1]})
     if (d.get("tiktok_src") or {}).get("unit") == "views" and d.get("tiktok_history"):
         series.append({r["week"]: r["value"] for r in d["tiktok_history"]})
     sc, nears, yoys = [], [], []

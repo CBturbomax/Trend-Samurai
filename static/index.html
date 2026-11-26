@@ -391,7 +391,8 @@ function mentionParts(d,key,pre){return Object.entries(d[key||'mentions']||{}).m
 function mentionBySub(d,key){const l=mentionParts(d,key);return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
 function mentionByTerm(d){const subs=Object.values(d.mentions);const l=d.variants.map((t,i)=>{const pts={};d.months.forEach(m=>{if(subs.length&&subs.every(ms=>ms[m]))pts[m]=subs.reduce((a,ms)=>a+ms[m][t],0)});return{name:t,color:PAL[i%PAL.length],pts}});
   return l.length>1?[sumSeries('합계',l,d.months),...l]:l}
-const GP={web:'구글',youtube:'유튜브'},GEO={US:'미국',WW:'전세계',JA:'일본어'};
+const GP={web:'구글',youtube:'유튜브'},GEO={US:'미국',WW:'전세계',JP:'일본'};
+const jpW=(d,gp)=>{const f=g=>(d.trends_w||[]).find(t=>t.gprop===gp&&t.geo===g&&Object.keys(t.points).length);return f('JP')||(gp==='web'?f('JA'):null)};
 const jaName=d=>d&&d.ja?`${d.ja.term} (${d.ja.ko})`:'';
 function trendSeries(d,gprop,geo){
   const l=d.trends.filter(s=>s.gprop===gprop&&s.geo===geo).map((s,i)=>({name:s.term,color:PAL[i%PAL.length],pts:Object.fromEntries(Object.entries(s.points).map(([m,v])=>[m,v[0]]))}));
@@ -399,14 +400,13 @@ function trendSeries(d,gprop,geo){
   return l}
 const trendMain=(d,gprop,geo)=>{const l=trendSeries(d,gprop,geo);return l.find(s=>s.isSum)||l[0]};
 function trendChart(d,gprop){
-  if(S.geo==='JA'&&gprop!=='web')S.geo='WW';
-  if(S.geo==='JA'&&!d.ja)return '<div class="box dim">일본어 검색어 없음 (일본 브랜드만)</div>';
-  const w=(d.trends_w||[]).find(t=>t.gprop===gprop&&t.geo===S.geo);
-  if(S.geo==='JA'&&!(w&&Object.keys(w.points).length))return `<div class="box dim">일본어 검색 ${esc(jaName(d))} · 수집 중</div>`;
+  if(S.geo==='JP'&&!d.ja)return '<div class="box dim">일본 검색은 일본 브랜드만</div>';
+  const w=S.geo==='JP'?jpW(d,gprop):(d.trends_w||[]).find(t=>t.gprop===gprop&&t.geo===S.geo);
+  if(S.geo==='JP'&&!w)return `<div class="box dim">일본 검색 「${esc(jaName(d))}」 · 수집 중</div>`;
   if(w&&Object.keys(w.points).length){   // 주간 값이 있으면 주간으로
     let weeks=Object.keys(w.points).sort();const n=S.range==='1y'?53:S.range==='3y'?157:weeks.length;weeks=weeks.slice(-n);
     const cur=weeks.find(k=>w.points[k][1])||null;
-    return chart(`trendw-${gprop}-${S.geo}`,{daily:true,months:weeks,cur,title:S.geo==='JA'?`구글 · 일본어 검색 「${esc(jaName(d))}」 (주간)`:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]}, 주간)`,desc:'',
+    return chart(`trendw-${gprop}-${S.geo}`,{daily:true,months:weeks,cur,title:S.geo==='JP'?`${GP[gprop]} · 검색 관심도 (일본 · 「${esc(jaName(d))}」, 주간)`:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]}, 주간)`,desc:'',
       series:[{name:'검색 관심도',color:PAL[0],pts:Object.fromEntries(weeks.map(k=>[k,w.points[k][0]]))}],source:''});
   }
   return chart(`trend-${gprop}-${S.geo}`,{months:d.months,cur:d.cur_month,title:`${GP[gprop]} · 검색 관심도 (${GEO[S.geo]})`,
@@ -572,9 +572,9 @@ function viewCompare(){
     +chart('cmp-rc',{...o,title:'레딧 · 키워드 관련 댓글 수',desc:'개/월',source:'arctic-shift',series:mk(d=>redditPts(d,1))});
   if(S.tab==='yt')return chart('cmp-yn',{...o,title:'유튜브 · 월별 업로드 영상 수',desc:'개/월',source:'YouTube',series:mk(d=>ytSeries(d,0,'',PAL[0]).pts)})
     +chart('cmp-yv',{...o,title:'유튜브 · 조회수 합 (올라온 달 기준)',desc:'회',source:'YouTube',series:mk(d=>ytSeries(d,1,'',PAL[0]).pts)});
-  if(S.tab==='google'&&S.geo==='JA'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='web'&&t.geo==='JA');const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
-    const ser=ds.filter(d=>pw(d)&&Object.keys(pw(d).points).length).map(d=>({name:`${d.keyword} · ${jaName(d)}`,color:kcol(d.id),pts:Object.fromEntries(Object.entries(pw(d).points).map(([k,v])=>[k,v[0]]))}));
-    return ser.length?chart('cmp-ja',{daily:true,months:weeks,cur:null,title:'구글 · 일본어 검색 (주간)',desc:'',source:'',foot:'',series:ser}):'<div class="box dim">일본어 검색 자료 없음</div>';}
+  if(S.tab==='google'&&S.geo==='JP'){const mkj=gp=>{const ser=ds.map(d=>{const w=jpW(d,gp);return w&&{name:`${d.keyword} · ${jaName(d)}`,color:kcol(d.id),pts:Object.fromEntries(Object.entries(w.points).map(([k,v])=>[k,v[0]]))}}).filter(Boolean);
+      const weeks=[...new Set(ser.flatMap(x=>Object.keys(x.pts)))].sort();return ser.length?chart('cmp-jp-'+gp,{daily:true,months:weeks,cur:null,title:`${GP[gp]} · 검색 관심도 (일본, 주간)`,desc:'',source:'',foot:'',series:ser}):''};
+    return (mkj('web')+mkj('youtube'))||'<div class="box dim">일본 검색 자료 없음</div>';}
   if(S.tab==='google'){const g=(gp)=>mk(d=>{const s=trendMain(d,gp,S.geo);return s?s.pts:{}});
     return chart('cmp-gw',{...o,title:`구글 · 검색 관심도 (${GEO[S.geo]})`,desc:'',source:'Google Trends',series:g('web')})
      +chart('cmp-gy',{...o,title:`유튜브 검색 관심도 (${GEO[S.geo]})`,desc:'',source:'Google Trends',series:g('youtube')});}
@@ -619,7 +619,7 @@ function render(){
     const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
     $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
       <div class="filters">${tg2(TABS,'tab',S.tab,'tab')}</div>
-      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['WW','전세계'],['US','미국'],...(S.sel.some(i=>(S.cmpData[i]||{}).ja)?[['JA','일본어']]:[])],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
+      <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['WW','전세계'],['US','미국'],...(S.sel.some(i=>(S.cmpData[i]||{}).ja)?[['JP','일본']]:[])],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
     return}
   $('#kpis').innerHTML='';
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
@@ -628,7 +628,7 @@ function render(){
    <select class="gsel" id="gCtr"><option value="">미분류</option>${CTRS.map(c=>`<option ${d.country===c?'selected':''}>${c}</option>`).join('')}</select></span></div>
    <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
    <div class="filters">${tg([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}
-   ${['yt','google','year'].includes(S.tab)?tg([['WW','전세계'],['US','미국'],...(S.tab==='google'&&d.ja?[['JA','일본어']]:[])],'geo',(S.geo==='JA'&&!(S.tab==='google'&&d.ja))?'WW':S.geo,'g'):''}
+   ${['yt','google','year'].includes(S.tab)?tg([['WW','전세계'],['US','미국'],...(['yt','google'].includes(S.tab)&&d.ja?[['JP','일본']]:[])],'geo',(S.geo==='JP'&&!(['yt','google'].includes(S.tab)&&d.ja))?'WW':S.geo,'g'):''}
    <div class="actions"><button class="btn" id="btnRefresh">갱신</button>${d.full?'':'<button class="btn" id="btnFull">과거 데이터 받기</button>'}<button class="btn" id="btnCsv">CSV</button><button class="btn" id="btnHtml">리포트</button><button class="btn warn" id="btnDel">삭제</button></div></div></section>`+VIEW[S.tab](d);
 }
 
@@ -673,9 +673,9 @@ function savedHtml(){
   const list=f?all.filter(k=>k.name.includes(f)):S.cat==='전체'?all:groups[S.cat]||[];
   const selIn=g=>groups[g].filter(k=>S.sel.includes(k.id)).length;
   const al=S.alerts||[],nh=al.filter(r=>r.highs).length;
-  const MET=['구글 검색','일본어 검색','유튜브 검색','레딧 글 수','틱톡 조회수','핀터레스트 검색'];
-  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'},'핀터레스트 검색':{c:'#E60023',i:ICO.pin,t:'검색'},'일본어 검색':{c:'#BC002D',i:ICO.google,t:'日本'}};
-  const MT={'일본어 검색':'google-ja','구글 검색':'google','유튜브 검색':'yt','레딧 글 수':'reddit','틱톡 조회수':'tiktok','핀터레스트 검색':'pin'};
+  const MET=['구글 검색','유튜브 검색','레딧 글 수','틱톡 조회수','핀터레스트 검색'];
+  const MC={'구글 검색':{c:'#4285F4',i:ICO.google,t:'검색'},'유튜브 검색':{c:'#FF0000',i:ICO.yt,t:'검색'},'레딧 글 수':{c:'#FF4500',i:ICO.reddit,t:'글'},'틱톡 조회수':{c:'#25F4EE',i:ICO.tiktok,t:'조회'},'핀터레스트 검색':{c:'#E60023',i:ICO.pin,t:'검색'}};
+  const MT={'구글 검색':'google','유튜브 검색':'yt','레딧 글 수':'reddit','틱톡 조회수':'tiktok','핀터레스트 검색':'pin'};
   const cell=(a,m)=>!a?'<td class="mx-n">·</td>':a.kind==='high'?`<td class="mx-h" data-t="${MT[m]}">신고가</td>`:`<td class="mx-p" data-t="${MT[m]}">${a.pct}%</td>`;
   const abox=al.length?`<section class="alerts"><div class="al-head"><h3>신고가 모니터</h3><span class="al-k1">${nh}</span><span class="al-l">신고가</span><span class="al-k2">${al.length-nh}</span><span class="al-l">근접 (최고 대비 95%↑)</span></div>
    <div class="al-wrap"><table class="mx"><colgroup><col class="c-k"><col class="c-c">${MET.map(()=>'<col class="c-m">').join('')}<col class="c-d"></colgroup>
@@ -730,7 +730,7 @@ const vals=sel=>[...document.querySelectorAll(sel+':checked')].map(x=>x.value);
 document.addEventListener('click',async e=>{
   // 신고가 모니터: 그 키워드 하나만 골라 해당 플랫폼 차트로 이동(누른 칸의 플랫폼, 아니면 신고가 난 플랫폼)
   const row=e.target.closest('tr.mxrow');
-  if(row){const td=e.target.closest('td[data-t]');S.tab=(td||row).dataset.t;if(S.tab==='google-ja'){S.tab='google';S.geo='JA'}else if(S.geo==='JA')S.geo='WW';S.sel=[];await select(+row.dataset.id);
+  if(row){const td=e.target.closest('td[data-t]');S.tab=(td||row).dataset.t;S.sel=[];await select(+row.dataset.id);
     const r=$('#result');if(r)window.scrollTo({top:r.getBoundingClientRect().top+scrollY-8,behavior:'smooth'});return}
   const t=e.target.closest('button')||e.target;   // 버튼 안의 글자·아이콘을 눌러도 버튼으로 인식
   if(t.id==='btnStart'){const r=await api('/api/keywords',{body:{name:$('#kw').value,variants:[...vals('.vck'),...split($('#vAdd').value)],own_subs:[...vals('.ock'),...split($('#oAdd').value)],mention_subs:split($('#mAdd').value)}});$('#cand').innerHTML='';$('#kw').value='';S.tab='reddit';select(r.id)}

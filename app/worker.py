@@ -1,4 +1,5 @@
 """작업 큐. 워커 1개가 순서대로 처리: ① 월별 총계 → ② 구글 트렌드 → ③ 언급 검색(최신 달부터)."""
+import json
 import datetime as dt
 import threading
 import time
@@ -102,6 +103,12 @@ def enqueue_keyword(kid, refresh=False):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
         if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
             _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
+    # 일본 브랜드: 일본에서 일본어로 검색한 구글·유튜브 주간(6일 안에 받은 게 없으면)
+    if q("SELECT 1 FROM meta WHERE key=?", (f"ja:{kid}",)):
+        wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
+        for g in ("web", "youtube"):
+            if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo='JP' AND updated_at>? LIMIT 1", (kid, g, wk)):
+                _add(kid, "trends", 1, gprop=g, geo="JP", month="W")
     # 핀터레스트 주간(나라별, 최근 2년): 6일 안에 받은 게 없으면 다시(미국 먼저)
     wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
     for i, cc in enumerate(PIN_GEOS):
@@ -415,6 +422,11 @@ def do_totals(job):
 def do_trends(job):
     kid = job["keyword_id"]
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=? ORDER BY rowid", (kid,))][:5]
+    if job["geo"] == "JP":   # 일본: 일본어 검색어로
+        ja = q("SELECT value FROM meta WHERE key=?", (f"ja:{kid}",))
+        if not ja:
+            return _set(job, "done", "일본어 검색어 없음")
+        terms = [json.loads(ja[0]["value"])["term"]]
     gprop = "" if job["gprop"] == "web" else job["gprop"]
     geo = "" if job["geo"] == "WW" else job["geo"]
     weekly = job.get("month") == "W"
