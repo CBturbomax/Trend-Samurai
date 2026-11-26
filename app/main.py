@@ -702,10 +702,10 @@ def _wk_mom(pts):
 
 
 def momentum(d):
-    """기세 점수(0~100): 지표마다 0.6×(최근이 2년 최고의 몇 %) + 0.4×(전년 대비: +100%↑=100, 0%=50, −100%=0) → 평균."""
+    """기세 점수(0~100): 구글·유튜브 검색, 핀터레스트(미국), 틱톡, 일본 브랜드는 일본어 검색까지. 지표마다 0.6×(최근이 2년 최고의 몇 %) + 0.4×(전년 대비: +100%↑=100, 0%=50, −100%=0) → 평균."""
     series = []
     for t in d.get("trends_w", []):
-        if t["points"] and (t["gprop"], t["geo"]) in (("web", "WW"), ("youtube", "WW"), ("pinterest", "US")):
+        if t["points"] and (t["gprop"], t["geo"]) in (("web", "WW"), ("youtube", "WW"), ("pinterest", "US"), ("web", "JA")):
             series.append({k: v[0] for k, v in t["points"].items() if not v[1]})
     if (d.get("tiktok_src") or {}).get("unit") == "views" and d.get("tiktok_history"):
         series.append({r["week"]: r["value"] for r in d["tiktok_history"]})
