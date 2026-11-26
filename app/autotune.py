@@ -15,7 +15,7 @@ from .db import q, x
 STATS = collections.defaultdict(lambda: collections.deque(maxlen=3000))   # source → (시각, 성공여부)
 LOG = collections.deque(maxlen=60)
 PAUSE = {}   # source → 이 시각까지 쉼
-BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (0.8, 10.0)}
+BOUNDS = {"arctic": (1.5, 4.0), "trends": (40.0, 1200.0), "youtube": (4.0, 15.0)}
 GAPS = {"arctic": C.ARCTIC_GAP, "trends": 180.0, "youtube": C.YT_WEB_GAP}
 NAMES = {"arctic": "레딧", "trends": "구글 트렌드", "youtube": "유튜브", "tiktok": "틱톡", "pinterest": "핀터레스트"}
 
@@ -122,6 +122,8 @@ def start():
         if r:   # 지난번 값으로 시작하되 허용 범위 안으로
             lo, hi = BOUNDS[src]
             GAPS[src] = min(hi, max(lo, float(r[0]["value"])))
+    for src, (lo, hi) in BOUNDS.items():   # 저장값이 없어도 허용 범위 안으로
+        GAPS[src] = min(hi, max(lo, GAPS[src]))
     GAPS["trends"] = min(GAPS["trends"], 180.0)   # 예전 버그로 부풀었던 값은 3분으로 되돌림
     C.ARCTIC_GAP, C.YT_WEB_GAP = GAPS["arctic"], GAPS["youtube"]
     note(f"시작: 레딧 {GAPS['arctic']:g}초 · 유튜브 {GAPS['youtube']:g}초 · 구글 {GAPS['trends']:g}초 간격")
