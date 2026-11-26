@@ -449,6 +449,10 @@ def probe_pin(path: str = "metrics/", qs: str = ""):
         return {"url": u, "err": type(e).__name__}
 
 
+# 틱톡 회사 해시태그 값에 다른 브랜드가 크게 섞이는 키워드(회사의 대표 브랜드가 아님)
+TT_MIXED = {"nintendo switch","pokemon cards","g-shock","hello kitty","kuromi","retatrutide","zepbound","hoka","ugg","arcteryx","salomon","onitsuka tiger","alani nu","rhode"}
+
+
 @app.get("/api/probe_ttcc")
 def probe_ttcc(tag: str = "medicube", period: int = 1095, country: str = "US"):
     """틱톡 크리에이티브 센터 해시태그 추이가 서버에서 받아지는지 확인."""
@@ -594,6 +598,7 @@ def build(kid: int):
         "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
         "tiktok_history": tt_hist,
         "full": bool(q("SELECT 1 FROM meta WHERE key=?", (f"full:{kid}",))),
+        "tiktok_mixed": k[0]["name"] in TT_MIXED,
         "tiktok_src": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ttsrc:{kid}",)) or [{"value": "{}"}])[0]["value"]),
         "mentions_c": mentions_c,
         "youtube": yt,
@@ -661,18 +666,10 @@ def keyword_alerts(d):
         for m, by in ms.items():
             rp[m] = rp.get(m, 0) + sum(by.values())
     out.append(_highs("레딧 글 수", rp, cur))
-    # 틱톡: 회사 전체 해시태그 합은 키워드 반응이 아니라 알림에서 뺌. 키워드 해시태그 주간 증가분이 8주 쌓이면 그걸로
-    days = {}
-    for t in d["tiktok"]:
-        for r in t["rows"]:
-            days[r["day"]] = days.get(r["day"], 0) + r["views"]
-    ks = sorted(days)
-    wk = {}
-    for a, b in zip(ks, ks[1:]):
-        w = (dt.date.fromisoformat(b) - dt.timedelta(days=dt.date.fromisoformat(b).weekday())).isoformat()
-        wk[w] = wk.get(w, 0) + max(0, days[b] - days[a])
-    if len(wk) >= 9:
-        out.append(_highs("틱톡 조회수", dict(sorted(wk.items())[:-1]), None, 8))
+    # 틱톡: 회사 해시태그 조회수(TickerTrends) — 키워드가 그 회사의 대표 브랜드일 때만(여러 브랜드가 섞이면 제외)
+    tt = {r["week"]: r["value"] for r in d["tiktok_history"]}
+    if (d.get("tiktok_src") or {}).get("unit") == "views" and d["keyword"] not in TT_MIXED:
+        out.append(_highs("틱톡 조회수", tt, None, 26))
     return [a for a in out if a]
 
 
