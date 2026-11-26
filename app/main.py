@@ -200,6 +200,16 @@ def add_mention_subs(kid: int, body: SubsIn):
     return {"ok": True}
 
 
+@app.post("/api/keywords/{kid}/own_subs")
+def add_own_subs(kid: int, body: SubsIn):
+    """전용 커뮤니티(글 수 전체를 셈)로 추가 — 언급으로 들어가 있던 건 전용으로 바꿈."""
+    for s in filter(None, map(_clean_sub, body.subs)):
+        x("INSERT OR REPLACE INTO subreddits VALUES(?,?,'own')", (kid, s))
+        x("DELETE FROM jobs WHERE keyword_id=? AND kind='mention' AND sub=? AND status!='done'", (kid, s))
+    worker.enqueue_keyword(kid)
+    return {"ok": True}
+
+
 @app.post("/api/keywords/{kid}/reddit_terms")
 def set_reddit_terms(kid: int, body: SubsIn):
     """레딧 언급 검색에만 쓰는 추가 검색어(예: rhode)."""
