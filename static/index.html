@@ -279,7 +279,7 @@ td.up{color:var(--up)} td.down{color:var(--down)}
 const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const api=async(u,o)=>{const r=await fetch(u,o&&{method:o.method||'POST',headers:{'content-type':'application/json'},body:o.body&&JSON.stringify(o.body)});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);return r.json()};
 const PAL=['#5B9BD5','#ED7D31','#70C1B3','#C792EA','#E06C75','#9CCC65','#4DD0E1','#B0BEC5'], Y='#FFCB05';
-const S={sel:[],geo:'WW',pgeo:'US',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
+const S={sel:[],geo:'WW',pgeo:'AVG',unit:'total',kid:null,data:null,tab:'reddit',range:'all',allLabels:false,cmp:new Set(),cmpData:{},hidden:{}};
 const REG={};
 
 /* ───── 숫자·날짜 ───── */
@@ -520,22 +520,35 @@ function viewTiktok(d){
     +chart('tt-hist',{daily:true,months:wk,cur:null,title:`참고 · ${esc(d.keyword)} 게시물 활동 지수 (주간)`,desc:'상대 지수',foot:'',source:'',series:[{name:'활동 지수',color:'#6b7785',pts}]});
 }
 function viewGoogle(d){return trendChart(d,'web')}
-const PGEO=[['US','미국'],['GB','영국'],['DE','독일'],['FR','프랑스'],['IT','이탈리아'],['ES','스페인']],PGN=Object.fromEntries(PGEO);
-const PGC={US:'#2F6FED',GB:'#D9534F',DE:'#17A2B8',FR:'#C99A2E',IT:'#8E44AD',ES:'#E83E8C'};
+const PGEO=[['US','미국'],['CA','캐나다'],['GB','영국'],['DE','독일'],['FR','프랑스'],['IT','이탈리아'],['ES','스페인'],['BR','브라질'],['MX','멕시코'],['AR','아르헨티나'],['CO','콜롬비아'],['KR','한국'],['IN','인도'],['ID','인도네시아'],['PH','필리핀']],PGN=Object.fromEntries(PGEO);
+const PGC={US:'#2F6FED',CA:'#E06C75',GB:'#D9534F',DE:'#17A2B8',FR:'#C99A2E',IT:'#8E44AD',ES:'#E83E8C',BR:'#2EA043',MX:'#9CCC65',AR:'#4DD0E1',CO:'#FFB74D',KR:'#C792EA',IN:'#FF8A65',ID:'#B0BEC5',PH:'#F48FB1'};
+const PREG=[['WW','전세계(대략)',['US','CA','GB','DE','FR','IT','ES','BR','MX','AR','CO','KR','IN','ID','PH']],['NA','북미',['US','CA']],['EU','유럽',['GB','DE','FR','IT','ES']],['LA','남미',['BR','MX','AR','CO']],['AS','아시아',['KR','IN','ID','PH']]];
+const PRC={NA:'#2F6FED',EU:'#17A2B8',LA:'#2EA043',AS:'#C792EA'};
+// 나라별 핀터레스트 사용자 규모(대략, 백만) — 나라 점수를 묶을 때 비중
+const PUW={US:90,CA:10,GB:15,DE:17,FR:15,IT:9,ES:9,BR:35,MX:20,AR:6,CO:5,KR:3,IN:15,ID:8,PH:5};
+S.preg='WW';
 const pinW=(d,c)=>{const w=(d.trends_w||[]).find(t=>t.gprop==='pinterest'&&t.geo===c);return w&&Object.keys(w.points).length?w.points:null};
-const pinSel=()=>`<div class="filters">${`<div class="toggle-group">${PGEO.map(([k,n])=>`<button class="toggle pgeo ${S.pgeo===k?'on':''}" data-pg="${k}">${n}</button>`).join('')}</div>`}</div>`;
+function pinAvg(d,codes){const have=codes.filter(c=>pinW(d,c));if(!have.length)return null;
+  const ws=[...new Set(have.flatMap(c=>Object.keys(pinW(d,c))))].sort(),o={};
+  ws.forEach(k=>{let a=0,b=0;have.forEach(c=>{const v=pinW(d,c)[k];if(v){a+=PUW[c]*v[0];b+=PUW[c]}});if(b)o[k]=Math.round(a/b*10)/10});return{pts:o,n:have.length}}
+const regOf=r=>PREG.find(x=>x[0]===r)||PREG[0];
+const pinPts=d=>{if(S.pgeo==='AVG'){const a=pinAvg(d,regOf(S.preg)[2]);return a&&a.pts}const p=pinW(d,S.pgeo);return p&&Object.fromEntries(Object.entries(p).map(([k,v])=>[k,v[0]]))};
+const pinName=()=>S.pgeo==='AVG'?regOf(S.preg)[1]+(S.preg==='WW'?'':' 평균(대략)'):PGN[S.pgeo];
+const pinSel=()=>{const r=regOf(S.preg);if(S.pgeo!=='AVG'&&!r[2].includes(S.pgeo))S.pgeo='AVG';
+  return `<div class="filters"><div class="toggle-group">${PREG.map(([k,n])=>`<button class="toggle preg ${S.preg===k?'on':''}" data-r="${k}">${n}</button>`).join('')}</div></div>`
+  +(S.preg==='WW'?'':`<div class="filters"><div class="toggle-group"><button class="toggle pgeo ${S.pgeo==='AVG'?'on':''}" data-pg="AVG">평균</button>${r[2].map(c=>`<button class="toggle pgeo ${S.pgeo===c?'on':''}" data-pg="${c}">${PGN[c]}</button>`).join('')}</div></div>`)};
 function viewPin(d){
-  const p=pinW(d,S.pgeo);
   const cut=ws=>S.range==='1y'?ws.slice(-53):ws;
-  let out=pinSel();
-  if(!p)out+=`<div class="box dim">핀터레스트 자료 없음 (${PGN[S.pgeo]})</div>`;
+  let out=pinSel();const p=pinPts(d);
+  if(!p||!Object.keys(p).length)out+=`<div class="box dim">핀터레스트 자료 없음 (${pinName()})</div>`;
   else{const weeks=cut(Object.keys(p).sort());
-    out+=chart('pin-w-'+S.pgeo,{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'',source:'',foot:'',
-      series:[{name:'검색 관심도',color:'#E60023',pts:Object.fromEntries(weeks.map(k=>[k,p[k][0]]))}]});}
-  const have=PGEO.filter(([c])=>pinW(d,c));
-  if(have.length>1){const weeks=cut([...new Set(have.flatMap(([c])=>Object.keys(pinW(d,c))))].sort());
-    out+=chart('pin-geo',{daily:true,months:weeks,cur:null,title:'핀터레스트 · 나라별 (주간)',desc:'',source:'',foot:'',
-      series:have.map(([c,n])=>({name:n,color:PGC[c],pts:Object.fromEntries(Object.entries(pinW(d,c)).map(([k,v])=>[k,v[0]]))}))});}
+    out+=chart('pin-w-'+S.preg+S.pgeo,{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${pinName()}, 주간)`,desc:'',source:'',foot:'',
+      series:[{name:'검색 관심도',color:'#E60023',pts:Object.fromEntries(weeks.map(k=>[k,p[k]]))}]});}
+  // 아래: 전세계면 지역별 평균, 지역이면 그 안의 나라별
+  const ser=S.preg==='WW'?PREG.slice(1).map(([k,n,cs])=>{const a=pinAvg(d,cs);return a&&{name:n,color:PRC[k],pts:a.pts}}).filter(Boolean)
+    :regOf(S.preg)[2].filter(c=>pinW(d,c)).map(c=>({name:PGN[c],color:PGC[c],pts:Object.fromEntries(Object.entries(pinW(d,c)).map(([k,v])=>[k,v[0]]))}));
+  if(ser.length>1){const weeks=cut([...new Set(ser.flatMap(x=>Object.keys(x.pts)))].sort());
+    out+=chart('pin-geo-'+S.preg,{daily:true,months:weeks,cur:null,title:S.preg==='WW'?'핀터레스트 · 지역별 (주간)':`핀터레스트 · ${regOf(S.preg)[1]} 나라별 (주간)`,desc:'',source:'',foot:'',series:ser});}
   return out;
 }
 
@@ -562,9 +575,9 @@ function viewCompare(){
   if(S.tab==='tiktok'){const weeks=[...new Set(ds.flatMap(d=>(d.tiktok_history||[]).map(r=>r.week)))].sort();
     const ser=ds.filter(d=>(d.tiktok_history||[]).length).map(d=>{const h=d.tiktok_history,mx=Math.max(...h.map(r=>r.value))||1;return{name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(h.map(r=>[r.week,Math.round(r.value/mx*1000)/10]))}});
     return ser.length?chart('cmp-tt',{daily:true,months:weeks,cur:null,title:'틱톡 · 주간 추이',desc:'',source:'TickerTrends',foot:'',series:ser}):'<div class="box dim">틱톡 자료 없음</div>';}
-  if(S.tab==='pin'){const pw=d=>(d.trends_w||[]).find(t=>t.gprop==='pinterest'&&t.geo===S.pgeo);const weeks=[...new Set(ds.flatMap(d=>Object.keys((pw(d)||{}).points||{})))].sort();
-    const ser=ds.filter(d=>pw(d)&&Object.keys(pw(d).points).length).map(d=>({name:d.keyword,color:kcol(d.id),pts:Object.fromEntries(Object.entries(pw(d).points).map(([k,v])=>[k,v[0]]))}));
-    return pinSel()+(ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${PGN[S.pgeo]}, 주간)`,desc:'',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>');}
+  if(S.tab==='pin'){const ser=ds.map(d=>({name:d.keyword,color:kcol(d.id),pts:pinPts(d)||{}})).filter(x=>Object.keys(x.pts).length);
+    const weeks=[...new Set(ser.flatMap(x=>Object.keys(x.pts)))].sort();
+    return pinSel()+(ser.length?chart('cmp-pin',{daily:true,months:weeks,cur:null,title:`핀터레스트 · 검색 관심도 (${pinName()}, 주간)`,desc:'',source:'',foot:'',series:ser}):'<div class="box dim">핀터레스트 자료 없음</div>');}
   return '<div class="box dim">요약표는 키워드 하나씩</div>';
 }
 const ICO={
@@ -724,6 +737,7 @@ document.addEventListener('click',async e=>{
   else if(t.classList.contains('unit')){S.unit=t.dataset.u;render()}
   else if(t.classList.contains('geo')){S.geo=t.dataset.g;render()}
   else if(t.classList.contains('pgeo')){S.pgeo=t.dataset.pg;render()}
+  else if(t.classList.contains('preg')){S.preg=t.dataset.r;S.pgeo='AVG';render()}
   else if(t.id==='btnLabels'){S.allLabels=!S.allLabels;render()}
   else if(t.closest('.lg')){const b=t.closest('.lg'),h=S.hidden[b.dataset.chart];h.has(b.dataset.s)?h.delete(b.dataset.s):h.add(b.dataset.s);render()}
   else if(t.id==='btnAddSubs'){const subs=[...vals('.candck'),...split($('#addSubs').value)];if(subs.length){await api(`/api/keywords/${S.kid}/mention_subs`,{body:{subs}});loadData()}}

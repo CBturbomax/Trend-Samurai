@@ -805,8 +805,8 @@ def do_global(job):
 HANDLERS = {"tiktok": do_tiktok, "yt": do_yt, "ytc": do_ytc, "ytstats": do_ytstats, "global": do_global, "totals": do_totals, "trends": do_trends, "mention": do_mention, "discover": do_discover}
 
 
-PIN_GEOS = ("US", "GB", "DE", "FR", "IT", "ES")
-PIN_GAP = 8   # 요청 사이 간격(초) — 핀터레스트는 빨리 두드리면 429
+PIN_GEOS = ("US", "CA", "GB", "DE", "FR", "IT", "ES", "BR", "MX", "AR", "CO", "KR", "IN", "ID", "PH")   # 핀터레스트가 주는 나라(일본·호주·네덜란드 등은 안 줌)
+PIN_GAP = 20   # 요청 사이 간격(초) — 핀터레스트는 빨리 두드리면 429
 
 
 def do_pin(job):
