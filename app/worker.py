@@ -84,6 +84,17 @@ def reddit_terms(kid):
 
 
 def enqueue_keyword(kid, refresh=False):
+    try:
+        _enqueue_keyword(kid, refresh)
+    except Exception:
+        try:   # 중간에 실패하면 트랜잭션이 열린 채 남아 DB 쓰기 잠금을 계속 쥐고 있게 됨 → 반드시 되돌림
+            x("ROLLBACK")
+        except Exception:
+            pass
+        raise
+
+
+def _enqueue_keyword(kid, refresh=False):
     terms = [r["term"] for r in q("SELECT term FROM variants WHERE keyword_id=?", (kid,))]
     subs = q("SELECT name,kind FROM subreddits WHERE keyword_id=?", (kid,))
     full = bool(q("SELECT 1 FROM meta WHERE key=?", (f"full:{kid}",)))   # 과거(2019~)까지 받기로 고른 키워드

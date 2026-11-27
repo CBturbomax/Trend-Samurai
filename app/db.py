@@ -1,5 +1,6 @@
 import sqlite3
 import threading
+import time
 from pathlib import Path
 
 from .config import DB_PATH
@@ -97,6 +98,10 @@ def q(sql, args=()):
 
 def x(sql, args=()):
     c = conn()
-    if sql == "BEGIN" and c.in_transaction:   # 앞선 요청이 중간에 실패해 트랜잭션이 열린 채 남았으면 정리(안 하면 그 스레드는 계속 500)
-        c.execute("ROLLBACK")
+    if sql == "BEGIN":
+        if c.in_transaction:   # 앞선 요청이 중간에 실패해 트랜잭션이 열린 채 남았으면 정리(안 하면 그 스레드는 계속 500)
+            c.execute("ROLLBACK")
+        _local.tx = time.time()
+    elif c.in_transaction and time.time() - getattr(_local, "tx", time.time()) > 120:
+        c.execute("ROLLBACK")   # 2분 넘게 열린 트랜잭션 = 실패하고 남은 것 → 쓰기 잠금을 풀어 다른 작업이 멈추지 않게
     return c.execute(sql, args)

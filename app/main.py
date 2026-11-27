@@ -108,6 +108,7 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 
+
 # 공개 주소에 올릴 때: 환경변수 KT_PASSWORD 를 넣으면 비밀번호를 물어봄(아이디는 아무거나)
 PASSWORD = os.environ.get("KT_PASSWORD", "")
 
