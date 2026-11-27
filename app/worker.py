@@ -670,8 +670,9 @@ def do_yt_web(job):
                 dry = dry + 1 if hit == 0 else 0
                 if not token or not vids or dry >= 2:   # 두 페이지 연속 관련 영상이 없으면 끝(뒤는 상관없는 영상뿐)
                     break
-                if pages >= (C.YT_WEB_MAX_PAGES if job.get("gprop") == "deep" else C.YT_WEB_FIRST_PAGES):
-                    capped = 1 if job.get("gprop") == "deep" else 2   # 2 = 1차(얕게)에서 한도 → 나중에 깊게 다시
+                gp = job.get("gprop")
+                if pages >= {"deep": C.YT_WEB_MAX_PAGES, "deep2": C.YT_WEB_TOP_PAGES}.get(gp, C.YT_WEB_FIRST_PAGES):
+                    capped = {"deep": 1, "deep2": 3}.get(gp, 2)   # 2 = 1차(얕게)에서 한도 → 나중에 깊게 다시, 3 = 상위 키워드 최대치에서도 한도
                     break
     except youtube.YTError as e:
         return _yt_fail(job, e)

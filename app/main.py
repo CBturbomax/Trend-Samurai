@@ -221,6 +221,22 @@ class BoostIn(BaseModel):
     sub: str
 
 
+class KidsIn(BaseModel):
+    kids: list[int]
+
+
+@app.post("/api/yt_deep")
+def yt_deep(body: KidsIn):
+    """기세 상위 키워드: 유튜브 검색 한도에 걸린 달을 25페이지까지 다시 받음(8페이지 작업은 취소)."""
+    n = 0
+    for kid in body.kids:
+        x("DELETE FROM jobs WHERE keyword_id=? AND kind='yt' AND gprop='deep' AND status IN ('queued','hold')", (kid,))
+        for r in q("SELECT start, end FROM yt_windows WHERE keyword_id=? AND capped IN (1,2)", (kid,)):
+            worker._add(kid, "yt", 1, month=r["start"][:7], start=r["start"], end=r["end"], gprop="deep2")
+            n += 1
+    return {"ok": True, "jobs": n}
+
+
 @app.post("/api/keywords/{kid}/boost_sub")
 def boost_sub(kid: int, body: BoostIn):
     """한 커뮤니티의 빈 달을 달 단위 작업으로 맨 앞에 세움(급히 채울 때)."""
