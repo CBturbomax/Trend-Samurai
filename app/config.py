@@ -47,6 +47,7 @@ skincareaddiction makeupaddiction beauty asianbeauty sephora ulta tennis 10s pic
 smartglasses gadgets kawaii plushies blindboxes actionfigures tcg anime_irl
 food travel cleaningtips homeimprovement frugal frugalmalefashion nintendoswitch ps5 hiking ultralight""".split()}
 MENTION_COMMENTS = False                                       # 댓글 본문 언급 검색(무겁고 거의 안 받아짐 → 끔, 글 언급에 집중)
+COMMENT_KEYWORDS = {"medicube"}                                # 댓글 언급까지 세는 키워드(사용자 관심 — 무거워서 골라서만)
 COMMENT_MONTHS = 24                                            # 레딧 댓글 언급은 최근 이만큼의 달만
 
 TRENDS_PROVIDER = os.environ.get("KT_TRENDS_PROVIDER", "pytrends")  # pytrends | serpapi

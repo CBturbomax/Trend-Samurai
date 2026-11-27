@@ -493,7 +493,7 @@ function mentionCharts(d,o){
   const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 언급 ${what} 수 · 수집 중</div>`;
     return chart(id,{...o,title:`레딧 · 주요 커뮤니티 ${n}곳 언급 ${what} 수`,desc,series:totalOf('합계',mentionParts(d,key))})};
   return one('men-s','mentions','글','개/월')
-;
+   +(Object.keys(d.mentions_c||{}).length?one('men-c','mentions_c','댓글','개/월 · 최근 2년 · 하루 단위까지 쪼개 받는 중'):'');
 }
 function redditManage(d){
   const cands=d.candidates.length?`<div class="box"><b>후보</b><div class="row">${d.candidates.map(c=>`<label class="ck"><input type="checkbox" class="candck" value="${esc(c.name)}">r/${esc(c.name)} <span class="dim">${c.hits==null?'확인 대기':c.hits<0?'확인 실패':'최근 6개월 '+c.hits+(c.hits>=100?'+':'')+'건'}</span></label>`).join('')}</div></div>`:'';

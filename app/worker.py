@@ -173,7 +173,8 @@ def _enqueue_keyword(kid, refresh=False):
         noc = bool(q("SELECT 1 FROM meta WHERE key=?", (f"nocomment:{s['name']}",)))
         comment_from = all_months()[0 if full else -C.COMMENT_MONTHS]
         rt = reddit_terms(kid)
-        for t in rt + ([] if noc or not C.MENTION_COMMENTS else [CPFX + t for t in rt]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
+        cm_on = C.MENTION_COMMENTS or bool(q("SELECT 1 FROM keywords WHERE id=? AND name IN (%s)" % ",".join("?" * len(C.COMMENT_KEYWORDS)), (kid, *C.COMMENT_KEYWORDS)))
+        for t in rt + ([] if noc or not cm_on else [CPFX + t for t in rt]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
@@ -397,6 +398,8 @@ def do_mention(job):
                 _add(job["keyword_id"], "mention", 5 if job["term"].startswith(CPFX) else 3, sub=sub, term=job["term"],
                      month=m, start=month_bounds(m)[0], end=month_bounds(m)[1])
             return _set(job, "done", f"{e} → 달 단위로 나눔")
+        if job["term"].startswith(CPFX) and tries >= 2 and days > 1:   # 큰 커뮤니티 댓글은 한 달·한 주도 시간 초과 → 반씩 쪼개 하루 단위까지
+            return _split(job, f"{e} → 기간 축소(댓글)")
         if job["term"].startswith(CPFX) and tries >= 6:   # 댓글은 오래 붙잡지 말고 보류 → 다른 달 먼저
             return _set(job, "hold", f"{e} · {tries}회 실패, 나중에 재시도", time.time() + 3600, tries)
         if tries < C.TRIES_BEFORE_SHRINK:   # 바로 다시 하면 같은 무거운 작업이 줄 맨 앞을 계속 차지 → 실패할수록 조금씩 뒤로

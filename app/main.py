@@ -79,7 +79,9 @@ async def lifespan(app):
         x(f"DELETE FROM jobs WHERE kind='mention' AND status!='done' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
         x("INSERT OR REPLACE INTO meta VALUES('giant_title_v1','1',?)", (time.time(),))
     if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
-        x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done'")
+        ck = list(C.COMMENT_KEYWORDS) or [""]
+        x(f"DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done' "
+          f"AND keyword_id NOT IN (SELECT id FROM keywords WHERE name IN ({','.join('?' * len(ck))}))", ck)
     if not C.AUTO_DISCOVER:
         x("DELETE FROM jobs WHERE kind='discover' AND status IN ('queued','hold')")
     x("UPDATE jobs SET status='queued', next_at=0, tries=0 WHERE kind='yt' AND status='hold'")   # 유튜브 보류분은 재시작 때 다시
