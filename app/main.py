@@ -758,7 +758,9 @@ def momentum(d):
         if ja:
             series.append({k: v[0] for k, v in ja["points"].items() if not v[1]})
     if (d.get("tiktok_src") or {}).get("unit") == "views" and d.get("tiktok_history"):
-        series.append({r["week"]: r["value"] for r in d["tiktok_history"]})
+        last = max(r["week"] for r in d["tiktok_history"])
+        if last >= (dt.date.today() - dt.timedelta(days=21)).isoformat():   # 3주 넘게 안 들어온 틱톡은 기세에서 뺌(멈춘 값이 점수를 끌어내림)
+            series.append({r["week"]: r["value"] for r in d["tiktok_history"]})
     sc, nears, yoys = [], [], []
     for pts in series:
         m = _wk_mom(pts)
