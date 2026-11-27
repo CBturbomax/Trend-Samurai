@@ -620,13 +620,13 @@ function render(){
     if(S.tab==='year')S.tab='reddit';
     $('#kpis').innerHTML='';$('#progress').style.display='none';
     const tg2=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
-    $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
+    $('#result').innerHTML=`<section class="panel"><div class="panel-head">${S.sel.length?`<button class="btn" id="btnSelClear" style="border:2px solid ${Y};color:${Y};font-weight:700;padding:8px 16px;margin-right:12px">✕ 선택 초기화 (${S.sel.length})</button>`:''}<h2>${S.sel.map(id=>{const x=S.cmpData[id];return `<span style="color:${kcol(id)}">${esc(x?x.keyword:'…')}</span>`}).join(' <span class="dim">vs</span> ')}</h2></div>
       <div class="filters">${tg2(TABS,'tab',S.tab,'tab')}</div>
       <div class="filters">${tg2([['all','전체'],['3y','3년'],['1y','1년']],'rng',S.range,'r')}${S.tab==='google'?tg2([['WW','전세계'],['US','미국'],...(S.sel.some(i=>(S.cmpData[i]||{}).ja)?[['JP','일본']]:[])],'geo',S.geo,'g'):''}</div></section>`+viewCompare();
     return}
   $('#kpis').innerHTML='';
   const tg=(items,cls,cur,attr)=>`<div class="toggle-group">${items.map(([k,n])=>`<button class="toggle ${cls} ${cur===k?'on':''}" aria-pressed="${cur===k}" data-${attr}="${k}">${n}</button>`).join('')}</div>`;
-  $('#result').innerHTML=`<section class="panel"><div class="panel-head"><h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span>
+  $('#result').innerHTML=`<section class="panel"><div class="panel-head">${S.sel.length?`<button class="btn" id="btnSelClear" style="border:2px solid ${Y};color:${Y};font-weight:700;padding:8px 16px;margin-right:12px">✕ 선택 초기화 (${S.sel.length})</button>`:''}<h2>${esc(d.keyword)}</h2><span class="count">변형: ${d.variants.map(esc).join(', ')} · 기준일 ${d.today} (UTC)</span>
    <span class="count">분류 <select class="gsel" id="gCat"><option value="">미분류</option>${CATS.map(c=>`<option ${d.category===c?'selected':''}>${c}</option>`).join('')}</select>
    <select class="gsel" id="gCtr"><option value="">미분류</option>${CTRS.map(c=>`<option ${d.country===c?'selected':''}>${c}</option>`).join('')}</select></span></div>
    <div class="filters">${tg(TABS,'tab',S.tab,'tab')}</div>
@@ -686,7 +686,7 @@ function savedHtml(){
    <tbody>${al.map(r=>{const by=Object.fromEntries(r.alerts.map(a=>[a.metric,a]));const at=r.alerts.map(a=>a.at.slice(0,7)).sort().pop();
      const first=MET.find(m=>by[m]&&by[m].kind==='high')||MET.find(m=>by[m]);
      return `<tr class="mxrow" data-id="${r.id}" data-t="${MT[first]||'reddit'}"><td class="mx-k">${esc(r.keyword)}</td><td class="mx-c">${esc(r.category||'')}</td>${MET.map(m=>cell(by[m],m)).join('')}<td class="r mx-d">${at}</td></tr>`}).join('')}</tbody></table></div></section>`:'';
-  return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label>${S.sel.length?`<button class="btn" id="btnSelClear">선택 초기화 (${S.sel.length})</button>`:''}</div>
+  return abox+`<div class="filters"><label class="search-box kw-search"><input type="text" id="kwFilter" placeholder="찾기" value="${esc(S.kwq)}"></label></div>
    ${f?'':`<div class="kcats"><button class="kcat ${S.cat==='전체'?'on':''}" data-cat="전체">전체<span>${all.length}</span></button>${names.map(g=>`<button class="kcat ${g===S.cat?'on':''}" data-cat="${esc(g)}">${esc(g)}<span>${groups[g].length}</span>${selIn(g)?'<b>•</b>':''}</button>`).join('')}</div>`}
    <div class="kgrid">${list.map((k,i)=>{const on=S.sel.includes(k.id),c=on?kcol(k.id):'';
      const sc=k.mom??0,tier=sc>=80?'t1':sc>=60?'t2':sc>=40?'t3':'t4';
