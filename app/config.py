@@ -44,7 +44,9 @@ GIANT_SUBS = {s.lower() for s in """anime gaming games pcgaming truegaming japan
 femalefashionadvice malefashionadvice streetwear sneakers running watches buyitforlife cooking fastfood edc toys collectibles
 nostalgia 90s fishing cycling bicycling camping campinggear hiking loseit gym supplements nutrition nyc foodporn
 skincareaddiction makeupaddiction beauty asianbeauty sephora ulta tennis 10s pickleball parenting toddlers daddit
-smartglasses gadgets kawaii plushies blindboxes actionfigures tcg anime_irl""".split()}
+smartglasses gadgets kawaii plushies blindboxes actionfigures tcg anime_irl
+food travel sephora beautyguruchatter 30plusskincare makeupaddiction skincareaddiction cleaningtips homeimprovement frugal
+frugalmalefashion outfits nintendoswitch ps5 ramen koreanfood japanesefood hiking ultralight campinggear loseit funkopop""".split()}
 MENTION_COMMENTS = False                                       # 댓글 본문 언급 검색(무겁고 거의 안 받아짐 → 끔, 글 언급에 집중)
 COMMENT_MONTHS = 24                                            # 레딧 댓글 언급은 최근 이만큼의 달만
 
