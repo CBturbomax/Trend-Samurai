@@ -554,6 +554,29 @@ def probe_ttcc(tag: str = "medicube", period: int = 1095, country: str = "US"):
         return {"err": f"{type(e).__name__}: {e}"[:300]}
 
 
+@app.get("/api/diag")
+def diag():
+    """저장 공간·DB 쓰기 상태(쓰기 오류 원인 찾기용)."""
+    import shutil
+    out = {}
+    try:
+        du = shutil.disk_usage(Path(C.DB_PATH).parent)
+        out["disk"] = {"total_mb": du.total // 2**20, "used_mb": du.used // 2**20, "free_mb": du.free // 2**20}
+    except Exception as e:
+        out["disk"] = repr(e)
+    for f in (C.DB_PATH, C.DB_PATH + "-wal"):
+        try:
+            out[Path(f).name] = os.path.getsize(f) // 2**20
+        except Exception as e:
+            out[Path(f).name] = repr(e)
+    try:
+        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", ("diag:write", "ok", time.time()))
+        out["write"] = "ok"
+    except Exception as e:
+        out["write"] = repr(e)
+    return out
+
+
 @app.get("/api/health")
 def health():
     return {"sources": autotune.summary(), "log": list(autotune.LOG), "yt_errs": worker.state.get("yt_errs", {}),
