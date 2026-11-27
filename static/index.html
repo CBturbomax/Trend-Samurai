@@ -466,7 +466,7 @@ function viewGlobal(d){
      </section>`;
 }
 /* 유튜브 (공식 API). 과거 달 값은 '그 달에 올라온 영상' 기준 */
-function ytSeries(d,idx,name,color){const pts={};Object.entries((d.youtube||{}).months||{}).forEach(([m,v])=>pts[m]=v[idx]);return{name,color,pts}}
+function ytSeries(d,idx,name,color){const pts={},dim={};Object.entries((d.youtube||{}).months||{}).forEach(([m,v])=>{pts[m]=v[idx];if(v[3])dim[m]=1});return{name,color,pts,dim}}
 function viewYoutube(d){
   const y=d.youtube||{};
   const SRC=y.official?'YouTube Data API (공식)':'YouTube 검색 (비공식)';
@@ -475,7 +475,7 @@ function viewYoutube(d){
   const base='제목·설명·채널명에 키워드가 든 영상만 셈.';
   const snaps=y.snapshots||[],top=y.top||[],ch=y.channels||[];
   const link=v=>`<a href="https://www.youtube.com/watch?v=${esc(v.video_id)}" target="_blank" rel="noopener">${esc(v.title.length>58?v.title.slice(0,57)+'…':v.title)}</a>`;
-  return chart('yt-n',{...o,title:'유튜브 · 월별 업로드 영상 수',desc:'개/월',foot:''+(y.capped?' 일부 달은 검색 결과 한도에 걸려 실제보다 적을 수 있음.':''),series:[ytSeries(d,0,'업로드 영상 수',PAL[0])]})
+  return chart('yt-n',{...o,title:'유튜브 · 월별 업로드 영상 수',desc:'개/월',foot:''+(y.capped?' 점선·빈 점 = 검색 결과 한도에 걸린 달(실제보다 적음, 깊게 다시 받는 중).':''),series:[ytSeries(d,0,'업로드 영상 수',PAL[0])]})
    + chart('yt-v',{...o,title:'유튜브 · 조회수 합 (올라온 달 기준)',desc:'회 · 그 달에 올라온 영상의 현재 누적 조회수',foot:'',series:[ytSeries(d,1,'조회수 합',PAL[1])]})
    + `<section class="panel"><div class="panel-head"><h2>유튜브 · 조회수 상위 영상</h2><span class="count">상위 ${top.length}개</span></div>
      ${top.length?`<div class="table-wrap"><table class="data-table"><thead><tr><th>영상</th><th>채널</th><th>게시일</th><th>조회수</th></tr></thead><tbody>${top.map(v=>`<tr><td style="white-space:normal;min-width:220px">${link(v)}</td><td>${esc(v.channel.slice(0,22))}</td><td>${v.published}</td><td>${v.views.toLocaleString()}</td></tr>`).join('')}</tbody></table></div>`:'<div class="box dim">수집 중</div>'}</section>`

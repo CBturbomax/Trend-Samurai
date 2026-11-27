@@ -630,11 +630,14 @@ def build(kid: int):
     # 유튜브
     n_c = q("SELECT COUNT(*) n, SUM(comments_at IS NOT NULL) c FROM yt_videos WHERE keyword_id=?", (kid,))[0]
     yt = {"enabled": True, "official": bool(worker.yt_key()), "with_comments": n_c["c"] or 0, "months": {}, "top": [], "snapshots": [], "total": 0, "capped": 0}
-    covered = set()
+    covered, capm = set(), set()
     for r in q("SELECT start, end, status, capped FROM yt_windows WHERE keyword_id=?", (kid,)):
         if r["status"] != "split":
-            covered |= {m for m in months if r["start"][:7] <= m < r["end"][:7] or m == r["start"][:7]}
+            ms = {m for m in months if r["start"][:7] <= m < r["end"][:7] or m == r["start"][:7]}
+            covered |= ms
             yt["capped"] += r["capped"]
+            if r["capped"]:
+                capm |= ms
     agg = {r["m"]: r for r in q(
         "SELECT substr(published,1,7) m, COUNT(*) n, SUM(views) v, SUM(comments) c, SUM(likes) l, "
         "SUM(comments_at IS NOT NULL) cn "
@@ -642,7 +645,7 @@ def build(kid: int):
     for m in sorted(covered):
         r = agg.get(m)
         # 댓글 수는 그 달 영상의 95% 이상을 받았을 때만 보여 줌(덜 받은 달은 '없음')
-        yt["months"][m] = [r["n"], r["v"], r["c"] if (r["cn"] or 0) >= 0.95 * r["n"] else None] if r else [0, 0, 0]
+        yt["months"][m] = ([r["n"], r["v"], r["c"] if (r["cn"] or 0) >= 0.95 * r["n"] else None] if r else [0, 0, 0]) + [int(m in capm)]   # 4번째: 검색 한도에 걸린 달(실제보다 적음)
     yt["top"] = [dict(r) for r in q(
         "SELECT video_id, title, channel, published, views, comments, likes FROM yt_videos "
         "WHERE keyword_id=? ORDER BY views DESC LIMIT 20", (kid,))]
