@@ -251,6 +251,13 @@ def yt_deep(body: KidsIn):
     return {"ok": True, "jobs": n}
 
 
+@app.post("/api/keywords/{kid}/boost_comments")
+def boost_comments(kid: int):
+    """그 키워드의 레딧 댓글 언급 작업을 맨 앞으로."""
+    x("UPDATE jobs SET priority=-20, tries=0, next_at=0 WHERE keyword_id=? AND kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')", (kid,))
+    return {"ok": True}
+
+
 @app.post("/api/keywords/{kid}/boost_sub")
 def boost_sub(kid: int, body: BoostIn):
     """한 커뮤니티의 빈 달을 달 단위 작업으로 맨 앞에 세움(급히 채울 때)."""
