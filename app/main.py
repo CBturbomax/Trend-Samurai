@@ -162,6 +162,12 @@ def _clean_sub(s):
     return s.strip().removeprefix("/").removeprefix("r/").strip()
 
 
+def _same_sub(kid, s):
+    """레딧 이름은 대소문자 구분이 없음 → 이미 있는 이름(r/Seiko)이 있으면 그 이름을 씀(r/seiko 중복 방지)."""
+    r = q("SELECT name FROM subreddits WHERE keyword_id=? AND lower(name)=lower(?)", (kid, s))
+    return r[0]["name"] if r else s
+
+
 @app.post("/api/keywords")
 def create_keyword(body: KeywordIn):
     name = body.name.strip().lower()
@@ -178,7 +184,7 @@ def create_keyword(body: KeywordIn):
       f"AND term NOT IN ({','.join('?' * len(terms) * 2)})", (kid, *terms, *("c:" + t for t in terms)))
     for kind, subs in (("own", body.own_subs), ("mention", body.mention_subs)):
         for s in filter(None, map(_clean_sub, subs)):
-            x("INSERT OR REPLACE INTO subreddits VALUES(?,?,?)", (kid, s, kind))
+            x("INSERT OR REPLACE INTO subreddits VALUES(?,?,?)", (kid, _same_sub(kid, s), kind))
     worker.enqueue_keyword(kid)
     if body.own_subs and (C.AUTO_DISCOVER or not q("SELECT 1 FROM subreddits WHERE keyword_id=? AND kind='mention'", (kid,))):
         worker._add(kid, "discover", 0)   # 새 키워드라 언급 커뮤니티가 없을 때만 자동 선별
@@ -192,7 +198,7 @@ class SubsIn(BaseModel):
 @app.post("/api/keywords/{kid}/mention_subs")
 def add_mention_subs(kid: int, body: SubsIn):
     for s in filter(None, map(_clean_sub, body.subs)):
-        x("INSERT OR IGNORE INTO subreddits VALUES(?,?,'mention')", (kid, s))
+        x("INSERT OR IGNORE INTO subreddits VALUES(?,?,'mention')", (kid, _same_sub(kid, s)))
         x("DELETE FROM candidates WHERE keyword_id=? AND lower(name)=lower(?)", (kid, s))
     # 언급 커뮤니티가 생겼으니 자동 선별은 뒤로(언급 수 세기가 먼저)
     x("UPDATE jobs SET priority=4 WHERE keyword_id=? AND kind='discover' AND status IN ('queued','hold')", (kid,))
@@ -204,6 +210,7 @@ def add_mention_subs(kid: int, body: SubsIn):
 def add_own_subs(kid: int, body: SubsIn):
     """전용 커뮤니티(글 수 전체를 셈)로 추가 — 언급으로 들어가 있던 건 전용으로 바꿈."""
     for s in filter(None, map(_clean_sub, body.subs)):
+        s = _same_sub(kid, s)
         x("INSERT OR REPLACE INTO subreddits VALUES(?,?,'own')", (kid, s))
         x("DELETE FROM jobs WHERE keyword_id=? AND kind='mention' AND sub=? AND status!='done'", (kid, s))
     worker.enqueue_keyword(kid)
