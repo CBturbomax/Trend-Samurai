@@ -170,7 +170,7 @@ def _enqueue_keyword(kid, refresh=False):
     for s in subs:
         if s["kind"] != "mention":
             continue
-        noc = bool(q("SELECT 1 FROM meta WHERE key=?", (f"nocomment:{s['name']}",)))
+        noc = bool(q("SELECT 1 FROM meta WHERE key IN (?,?)", (f"nocomment:{s['name']}", f"nocomment:{s['name'].lower()}",)))
         comment_from = all_months()[0 if full else -C.COMMENT_MONTHS]
         rt = reddit_terms(kid)
         cm_on = C.MENTION_COMMENTS or bool(q("SELECT 1 FROM keywords WHERE id=? AND name IN (%s)" % ",".join("?" * len(C.COMMENT_KEYWORDS)), (kid, *C.COMMENT_KEYWORDS)))

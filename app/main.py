@@ -78,6 +78,9 @@ async def lifespan(app):
         x(f"DELETE FROM mention_windows WHERE term NOT LIKE 'c:%' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
         x(f"DELETE FROM jobs WHERE kind='mention' AND status!='done' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
         x("INSERT OR REPLACE INTO meta VALUES('giant_title_v1','1',?)", (time.time(),))
+    for sb in C.COMMENT_SKIP_SUBS:   # 댓글 검색이 안 되는 초대형 커뮤니티: 댓글 작업 정리 + 다시 안 넣게 표시
+        x("INSERT OR IGNORE INTO meta VALUES(?,?,?)", (f"nocomment:{sb}", "1", time.time()))
+        x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND lower(sub)=? AND status!='done'", (sb,))
     if not C.MENTION_COMMENTS:   # 댓글 언급 검색 대기분 정리(글 언급에 집중)
         ck = list(C.COMMENT_KEYWORDS) or [""]
         x(f"DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status!='done' "
