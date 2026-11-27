@@ -358,6 +358,7 @@ class TTHistIn(BaseModel):
     rows: list[list]   # [[week 'YYYY-MM-DD', value], ...]
     unit: str = "activity"   # activity(키워드 활동 지수) | views(회사 단위 해시태그 조회수)
     label: str = ""           # views일 때 회사명·종목코드
+    videos: list[list] = []   # exolyt: [[month 'YYYY-MM-01', 신규 영상 수], ...]
 
 
 @app.post("/api/tiktok/history")
@@ -370,6 +371,8 @@ def tiktok_history(body: TTHistIn):
     for wk, v in body.rows:
         x("INSERT OR REPLACE INTO tt_history VALUES(?,?,?)", (kid, wk, float(v)))
     x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"ttsrc:{kid}", json.dumps({"unit": body.unit, "label": body.label}), time.time()))
+    if body.videos:
+        x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"ttvid:{kid}", json.dumps(body.videos), time.time()))
     return {"ok": True, "n": len(body.rows)}
 
 
@@ -652,6 +655,7 @@ def build(kid: int):
     return {
         "tiktok": [{"tag": t, "rows": rows[:90]} for t, rows in tt.items()],
         "tiktok_history": tt_hist,
+        "tiktok_videos": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ttvid:{kid}",)) or [{"value": "[]"}])[0]["value"]),
         "full": bool(q("SELECT 1 FROM meta WHERE key=?", (f"full:{kid}",))),
         "tiktok_mixed": k[0]["name"] in TT_MIXED,
         "tiktok_src": json.loads((q("SELECT value FROM meta WHERE key=?", (f"ttsrc:{kid}",)) or [{"value": "{}"}])[0]["value"]),
@@ -731,6 +735,9 @@ def keyword_alerts(d):
     tt = {r["week"]: r["value"] for r in d["tiktok_history"]}
     if (d.get("tiktok_src") or {}).get("unit") == "views" and d["keyword"] not in TT_MIXED:
         out.append(_highs("틱톡 조회수", tt, None, 26))
+    if (d.get("tiktok_src") or {}).get("unit") == "exolyt":   # 해시태그 월별(마지막 달은 진행 중이라 빼고 비교)
+        cm = d["cur_month"] + "-01"
+        out.append(_highs("틱톡 조회수", tt, cm, 12))
     return [a for a in out if a]
 
 
@@ -762,6 +769,18 @@ def momentum(d):
         if last >= (dt.date.today() - dt.timedelta(days=21)).isoformat():   # 3주 넘게 안 들어온 틱톡은 기세에서 뺌(멈춘 값이 점수를 끌어내림)
             series.append({r["week"]: r["value"] for r in d["tiktok_history"]})
     sc, nears, yoys = [], [], []
+    if (d.get("tiktok_src") or {}).get("unit") == "exolyt" and d.get("tiktok_history"):   # 틱톡 해시태그 월별 조회수
+        mp = {r["week"][:7]: r["value"] for r in d["tiktok_history"] if r["week"][:7] < d["cur_month"] and r["value"]}
+        ms = sorted(mp)
+        if len(ms) >= 13:
+            last2 = (mp[ms[-1]] + mp[ms[-2]]) / 2            # 최근 2달 평균(완료된 달)
+            near = last2 / max(mp.values()) * 100
+            ago = [mp.get(m) for m in ms[-14:-12]]
+            yoy = (last2 / (sum(ago) / len(ago)) - 1) * 100 if all(ago) else None
+            ys = 50 if yoy is None else max(0, min(100, 50 + yoy / 2))
+            sc.append(0.6 * min(100, near) + 0.4 * ys); nears.append(near)
+            if yoy is not None:
+                yoys.append(yoy)
     for pts in series:
         m = _wk_mom(pts)
         if not m:

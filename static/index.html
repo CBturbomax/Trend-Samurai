@@ -518,6 +518,9 @@ function viewTiktok(d){
   const hist=d.tiktok_history||[],src=d.tiktok_src||{},isV=src.unit==='views',co=(src.label||'').replace(/\s*\(.*$/,'');
   if(hist.length<2)return '<div class="box dim">틱톡 자료 없음</div>';
   const pts=Object.fromEntries(hist.map(r=>[r.week,r.value])),wk=hist.map(r=>r.week);
+  if(src.unit==='exolyt'){const vd=Object.fromEntries((d.tiktok_videos||[]).map(r=>[r[0],r[1]]));
+    return chart('tt-xv',{daily:true,months:wk,cur:null,title:`틱톡 · ${esc(src.label||'')} 월별 신규 조회수`,desc:'회/월 · 마지막 달은 진행 중(일수 비례 추정)',foot:'',source:'Exolyt',series:[{name:'조회수',color:PAL[3],pts}]})
+      +(Object.keys(vd).length?chart('tt-xn',{daily:true,months:Object.keys(vd).sort(),cur:null,title:`틱톡 · ${esc(src.label||'')} 월별 신규 영상 수`,desc:'개/월',foot:'',source:'Exolyt',series:[{name:'영상 수',color:PAL[1],pts:vd}]}):'');}
   if(isV)return chart('tt-hist',{daily:true,months:wk,cur:null,title:`틱톡 · 해시태그 영상 조회수 (주간, 2년) — ${esc(co)} 브랜드 합산`,
     desc:`회/주 · ${esc(src.label||'')} 해시태그 합`,foot:'',source:'',series:[{name:'조회수',color:PAL[3],pts}]});
   if(isV)return `<div class="box dim small warn">${esc(co)}의 여러 브랜드가 합쳐진 값이라 ${esc(d.keyword)} 반응으로 보기 어려움 · 참고만</div>`
