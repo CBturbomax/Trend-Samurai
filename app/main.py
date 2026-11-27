@@ -45,6 +45,16 @@ async def lifespan(app):
     x("UPDATE jobs SET priority=5 WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')")
     x("DELETE FROM jobs WHERE kind='tiktok' AND status!='done'")   # 매일 누적 기록은 안 함
     x("DELETE FROM jobs WHERE kind='ytstats' AND status!='done'")   # 유튜브 매일 누적 기록도 안 함
+    # 구글 트렌드 대기열: 전세계(WW) 주간 → 일본 → 미국·월별 → 쇼핑 순(새 키워드 가산점 -10은 유지)
+    x("""UPDATE jobs SET priority=(CASE
+          WHEN month='W' AND gprop='froogle' THEN 3
+          WHEN month='W' AND geo='WW' THEN 0
+          WHEN month='W' AND geo='JP' THEN 1
+          WHEN month='W' THEN 2
+          WHEN geo='WW' AND gprop='web' THEN 1
+          WHEN geo='WW' THEN 2
+          WHEN gprop='web' THEN 3 ELSE 4 END) + (CASE WHEN priority<0 THEN -10 ELSE 0 END)
+        WHERE kind='trends' AND status IN ('queued','hold')""")
     x("DELETE FROM jobs WHERE kind='ytc' AND status!='done'")   # 유튜브 댓글 수는 수집하지 않음
     # 글 언급 기준이 바뀌면(제목만 → 제목+본문) 이전 집계를 지우고 다시 셈
     if (q("SELECT value FROM meta WHERE key='mention_field'") or [{"value": "title"}])[0]["value"] != C.MENTION_FIELD:

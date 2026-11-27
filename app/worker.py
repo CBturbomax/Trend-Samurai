@@ -63,7 +63,7 @@ def _is_new(kid):
 
 
 # 구글 트렌드 순서: 모든 키워드의 '구글·미국'을 먼저, 그다음 유튜브·미국, 전세계 순
-TREND_PRIO = {("web", "US"): 1, ("youtube", "US"): 2, ("web", "WW"): 3, ("youtube", "WW"): 4}
+TREND_PRIO = {("web", "WW"): 1, ("youtube", "WW"): 2, ("web", "US"): 3, ("youtube", "US"): 4}   # 전세계 먼저
 
 
 def reddit_terms(kid):
@@ -102,11 +102,11 @@ def enqueue_keyword(kid, refresh=False):
         # 주간 값: 6일 안에 받은 게 없으면 다시(전세계 먼저)
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
         if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop=? AND geo=? AND updated_at>? LIMIT 1", (kid, g, r, wk)):
-            _add(kid, "trends", 0 if r == "WW" else 1, gprop=g, geo=r, month="W")
+            _add(kid, "trends", 0 if r == "WW" else 2, gprop=g, geo=r, month="W")
     # 구글 쇼핑 검색(전세계, 주간): 구매 의도에 가까운 검색
     wk2 = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
     if not q("SELECT 1 FROM trends_w WHERE keyword_id=? AND gprop='froogle' AND geo='WW' AND updated_at>? LIMIT 1", (kid, wk2)):
-        _add(kid, "trends", 2, gprop="froogle", geo="WW", month="W")
+        _add(kid, "trends", 3, gprop="froogle", geo="WW", month="W")
     # 일본 브랜드: 일본에서 일본어로 검색한 구글·유튜브 주간(6일 안에 받은 게 없으면)
     if q("SELECT 1 FROM meta WHERE key=?", (f"ja:{kid}",)):
         wk = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=6)).isoformat(timespec="seconds")
