@@ -288,7 +288,7 @@ def _split(job, why):
     mid = (a + dt.timedelta(days=(b - a).days // 2)).isoformat()
     _save_window(job, job["start"], job["end"], None, "split")
     for s, e in ((job["start"], mid), (mid, job["end"])):
-        _add(job["keyword_id"], "mention", (5 if job["term"].startswith(CPFX) else min(3, job.get("priority") or 3)), sub=job["sub"], term=job["term"],   # 앞당겨 둔 글 작업은 쪼개도 우선순위 유지(댓글은 느려서 뒤로)
+        _add(job["keyword_id"], "mention", (min(5, job.get("priority") or 5) if job["term"].startswith(CPFX) else min(3, job.get("priority") or 3)), sub=job["sub"], term=job["term"],   # 앞당겨 둔 글 작업은 쪼개도 우선순위 유지(댓글은 느려서 뒤로)
              month=job["month"], start=s, end=e)
     _set(job, "done", why)
 
