@@ -84,6 +84,13 @@ async def lifespan(app):
         x(f"DELETE FROM mention_windows WHERE term NOT LIKE 'c:%' AND lower(sub) IN ({','.join('?'*len(fs))})", fs)
         x(f"DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status!='done' AND lower(sub) IN ({','.join('?'*len(fs))})", fs)
         x("INSERT OR REPLACE INTO meta VALUES('fulltext_v2','1',?)", (time.time(),))
+    # 댓글은 대표 검색어 하나만: 그 밖의 댓글 검색 대기분 정리
+    for k in q("SELECT id FROM keywords"):
+        rt = worker.reddit_terms(k["id"])
+        if len(rt) > 1:
+            ph = ",".join("?" * (len(rt) - 1))
+            x(f"DELETE FROM jobs WHERE keyword_id=? AND kind='mention' AND status!='done' AND term IN ({ph})",
+              (k["id"], *["c:" + t for t in rt[1:]]))
     for sb in C.COMMENT_SKIP_SUBS:   # 댓글 검색이 안 되는 초대형 커뮤니티: 댓글 작업 정리 + 다시 안 넣게 표시
         x("INSERT OR IGNORE INTO meta VALUES(?,?,?)", (f"nocomment:{sb}", "1", time.time()))
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND lower(sub)=? AND status!='done'", (sb,))
@@ -682,7 +689,7 @@ def build(kid: int):
 
     rterms = worker.reddit_terms(kid)
     mentions = mention_counts(rterms) if rterms else {}
-    mentions_c = mention_counts(["c:" + t for t in rterms]) if rterms else {}
+    mentions_c = mention_counts(["c:" + rterms[0]]) if rterms else {}   # 댓글은 대표 검색어 하나만
 
     tr = {}
     for r in q("SELECT * FROM trends WHERE batch LIKE ? ORDER BY month", (f"{kid}:%",)):

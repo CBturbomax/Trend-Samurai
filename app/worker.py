@@ -174,7 +174,7 @@ def _enqueue_keyword(kid, refresh=False):
         comment_from = all_months()[0 if full else -C.COMMENT_MONTHS]
         rt = reddit_terms(kid)
         cm_on = C.MENTION_COMMENTS or bool(q("SELECT 1 FROM keywords WHERE id=? AND name IN (%s)" % ",".join("?" * len(C.COMMENT_KEYWORDS)), (kid, *C.COMMENT_KEYWORDS)))
-        for t in rt + ([] if noc or not cm_on else [CPFX + t for t in rt]):   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
+        for t in rt + ([] if noc or not cm_on else [CPFX + t for t in rt[:1]]):   # 댓글은 대표 검색어 하나만(느려서 — 제품명까지 하면 몇 배)   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
