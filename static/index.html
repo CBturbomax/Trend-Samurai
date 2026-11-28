@@ -492,7 +492,14 @@ function mentionCharts(d,o){
   const n=Object.keys(d.mentions).length;if(!n)return '';
   const one=(id,key,what,desc)=>{const series=mentionBySub(d,key);if(!series.some(x=>Object.keys(x.pts).length))return `<div class="box dim">레딧 언급 ${what} 수 · 수집 중</div>`;
     return chart(id,{...o,title:`레딧 · 주요 커뮤니티 ${n}곳 언급 ${what} 수`,desc,series:totalOf('합계',mentionParts(d,key))})};
-  return one('men-s','mentions','글','개/월')
+  let both='';
+  if(Object.keys(d.mentions_c||{}).length){   // 댓글까지 세는 키워드: 글+댓글 합계(댓글은 최근 2년만이라 그 기간만)
+    const ms=d.months.slice(-25),cut=l=>l.map(x=>({...x,pts:Object.fromEntries(ms.filter(m=>x.pts[m]!=null).map(m=>[m,x.pts[m]]))}));
+    const P=sumSeries('글',cut(mentionParts(d,'mentions')),ms),C=sumSeries('댓글',cut(mentionParts(d,'mentions_c')),ms);
+    P.color=PAL[0];P.bold=false;C.color=PAL[1];C.bold=false;
+    both=chart('men-b',{...o,months:ms,title:`레딧 · 언급 글+댓글 합계 (${n}곳, 최근 2년)`,desc:'개/월 · 실제 대화량에 가장 가까움',series:totalOf('글+댓글',[P,C])});
+  }
+  return both+one('men-s','mentions','글','개/월')
    +(Object.keys(d.mentions_c||{}).length?one('men-c','mentions_c','댓글','개/월 · 최근 2년 · 하루 단위까지 쪼개 받는 중'):'');
 }
 function redditManage(d){
