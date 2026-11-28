@@ -47,7 +47,7 @@ skincareaddiction asianbeauty tennis 10s pickleball parenting toddlers daddit
 smartglasses gadgets kawaii plushies blindboxes actionfigures tcg anime_irl
 food travel cleaningtips homeimprovement frugal frugalmalefashion nintendoswitch ps5 hiking ultralight""".split()}
 MENTION_COMMENTS = False                                       # 댓글 본문 언급 검색(무겁고 거의 안 받아짐 → 끔, 글 언급에 집중)
-COMMENT_SKIP_SUBS = {"makeupaddiction", "skincareaddiction", "sephora", "beautyguruchatter", "beauty"}   # 댓글 검색이 거의 늘 시간 초과 + 레딧 전체를 느리게 함 → 댓글은 안 셈
+COMMENT_SKIP_SUBS = set()   # 댓글은 따로 도는 줄(redditc)에서 세므로 큰 커뮤니티도 셈 — 글 수집을 막지 않음   # 댓글 검색이 거의 늘 시간 초과 + 레딧 전체를 느리게 함 → 댓글은 안 셈
 COMMENT_KEYWORDS = {"medicube", "rhode"}                                # 댓글 언급까지 세는 키워드(사용자 관심 — 무거워서 골라서만)
 COMMENT_MONTHS = 24                                            # 레딧 댓글 언급은 최근 이만큼의 달만
 

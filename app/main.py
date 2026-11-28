@@ -91,6 +91,9 @@ async def lifespan(app):
             ph = ",".join("?" * (len(rt) - 1))
             x(f"DELETE FROM jobs WHERE keyword_id=? AND kind='mention' AND status!='done' AND term IN ({ph})",
               (k["id"], *["c:" + t for t in rt[1:]]))
+    for sb in ("makeupaddiction", "skincareaddiction", "sephora", "beautyguruchatter", "beauty"):   # 예전에 댓글 제외했던 곳 → 다시 셈
+        if sb not in C.COMMENT_SKIP_SUBS:
+            x("DELETE FROM meta WHERE key=?", (f"nocomment:{sb}",))
     for sb in C.COMMENT_SKIP_SUBS:   # 댓글 검색이 안 되는 초대형 커뮤니티: 댓글 작업 정리 + 다시 안 넣게 표시
         x("INSERT OR IGNORE INTO meta VALUES(?,?,?)", (f"nocomment:{sb}", "1", time.time()))
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND lower(sub)=? AND status!='done'", (sb,))

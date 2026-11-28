@@ -238,7 +238,15 @@ def daily_refresh():
 
 
 # ── arctic-shift 호출: 간격 지키기 + 실패 시 대기 ─────────────
+_cstate = {"cooldown_until": 0.0, "streak": 0, "next_ok": 0.0}   # 댓글 전용 줄의 대기 상태(글 줄과 따로)
+
+
 def call(fn, *a):
+    st = _cstate if threading.current_thread().name == "worker-redditc" else state   # 댓글이 느리거나 실패해도 글 수집은 안 멈추게
+    return _call(st, fn, *a)
+
+
+def _call(state, fn, *a):
     wait = max(state["cooldown_until"], state["next_ok"]) - time.time()
     if wait > 0:
         time.sleep(wait)
@@ -893,14 +901,34 @@ HANDLERS["pin"] = do_pin
 # 사이트별로 줄을 따로 세워 동시에 처리(같은 사이트 안에서는 여전히 한 번에 하나)
 GROUPS = {
     "reddit": ("totals", "mention", "discover"),
+    "redditc": ("mention",),   # 레딧 댓글 언급만(느림) — 글 수집과 따로 돌림
     "youtube": ("yt", "ytc", "ytstats"),
     "etc": ("trends", "tiktok", "global"),
     "pin": ("pin",),
 }
 
 
-def _next(kinds=None):
+def _next(kinds=None, group=None):
     kinds = kinds or tuple(HANDLERS)
+    if group in ("reddit", "redditc"):   # 레딧 글 줄은 댓글 작업 제외, 댓글 줄은 댓글 작업만
+        cf = "j.term LIKE 'c:%'" if group == "redditc" else "(j.term IS NULL OR j.term NOT LIKE 'c:%')"
+        now = time.time()
+        ks = ",".join("?" * len(kinds))
+        r = None
+        if group == "reddit" and "mention" in kinds:
+            state["rturn"] = state.get("rturn", 0) + 1
+            if state["rturn"] % 2 == 0:
+                r = q("SELECT j.* FROM jobs j LEFT JOIN krank k ON k.keyword_id=j.keyword_id "
+                      f"WHERE j.status='queued' AND j.next_at<=? AND j.kind='mention' AND {cf} "
+                      "ORDER BY j.priority, IFNULL(k.rank,9999), j.tries, j.month DESC, j.id LIMIT 1", (now,))
+        if not r:
+            r = q(f"SELECT j.* FROM jobs j LEFT JOIN krank k ON k.keyword_id=j.keyword_id "
+                  f"WHERE j.status='queued' AND j.next_at<=? AND j.kind IN ({ks}) AND {cf} "
+                  "ORDER BY j.priority, IFNULL(k.rank,9999), j.month DESC, j.id LIMIT 1", (now, *kinds))
+        if not r:
+            r = q(f"SELECT j.* FROM jobs j WHERE j.status='hold' AND j.next_at<=? AND j.kind IN ({ks}) AND {cf} "
+                  "ORDER BY j.next_at, j.id LIMIT 1", (now, *kinds))
+        return dict(r[0]) if r else None
     now = time.time()
     ks = ",".join("?" * len(kinds))
     r = None
@@ -954,7 +982,7 @@ def loop(group="all", kinds=None):
     cur = state["running"]
     while True:
         try:
-            job = _next(kinds)
+            job = _next(kinds, group)
             if not job:
                 cur.pop(group, None)
                 time.sleep(2)
