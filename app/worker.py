@@ -81,7 +81,8 @@ def reddit_terms(kid):
             continue
         seen.add(n)
         out.append(t)
-    return out
+    # 다른 검색어를 통째로 품은 검색어는 뺌('rhode skin'은 'rhode'에 이미 들어가 있어 더하면 두 번 셈)
+    return [t for t in out if not any(u != t and (p := _pat(u)) and p.search(t.lower()) for u in out)]
 
 
 def enqueue_keyword(kid, refresh=False):
