@@ -188,7 +188,12 @@ def _enqueue_keyword(kid, refresh=False):
             for m in all_months():
                 if full or m >= C.MENTION_POST_START:   # 기본은 최근 몇 년만(속도). '과거까지 받기'를 고르면 2019년부터
                     years.setdefault(m[:4], []).append(m)
-            if t.startswith(CPFX):   # 댓글: 최근 구간의 빈 달이 이어져 있으면 전체를 한 번에
+            if t.startswith(CPFX):   # 댓글: 달 단위로만(긴 창은 거의 늘 시간 초과 → 쪼개느라 몇 시간씩 허비, 실측)
+                for m in reversed([m for m in all_months() if m >= comment_from and month_bounds(m)[0] not in have]):
+                    a, b = month_bounds(m)
+                    _add(kid, "mention", 5, sub=s["name"], term=t, month=m, start=a, end=b)
+                continue
+            if False:
                 am = all_months()
                 run = [m for m in am if m >= comment_from and month_bounds(m)[0] not in have]
                 if len(run) > 12 and not C.MENTION_MULTIYEAR:   # 긴 창은 시간 초과가 잦음(실측) → 최근 12개월부터, 나머지는 다음 차례
@@ -406,7 +411,7 @@ def do_mention(job):
                 _add(job["keyword_id"], "mention", 5 if job["term"].startswith(CPFX) else 3, sub=sub, term=job["term"],
                      month=m, start=month_bounds(m)[0], end=month_bounds(m)[1])
             return _set(job, "done", f"{e} → 달 단위로 나눔")
-        if job["term"].startswith(CPFX) and tries >= 2 and days > 1:   # 큰 커뮤니티 댓글은 한 달·한 주도 시간 초과 → 반씩 쪼개 하루 단위까지
+        if job["term"].startswith(CPFX) and tries >= 1 and days > 1:   # 큰 커뮤니티 댓글은 한 달·한 주도 시간 초과 → 반씩 쪼개 하루 단위까지
             return _split(job, f"{e} → 기간 축소(댓글)")
         if job["term"].startswith(CPFX) and tries >= 6:   # 댓글은 오래 붙잡지 말고 보류 → 다른 달 먼저
             return _set(job, "hold", f"{e} · {tries}회 실패, 나중에 재시도", time.time() + 3600, tries)

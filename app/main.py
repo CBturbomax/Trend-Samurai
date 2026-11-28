@@ -84,6 +84,8 @@ async def lifespan(app):
         x(f"DELETE FROM mention_windows WHERE term NOT LIKE 'c:%' AND lower(sub) IN ({','.join('?'*len(fs))})", fs)
         x(f"DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status!='done' AND lower(sub) IN ({','.join('?'*len(fs))})", fs)
         x("INSERT OR REPLACE INTO meta VALUES('fulltext_v2','1',?)", (time.time(),))
+    # 댓글: 여러 달짜리 대기 작업은 지우고 달 단위로 다시(아래 enqueue에서)
+    x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold') AND julianday(end)-julianday(start) > 40")
     # 댓글은 대표 검색어 하나만: 그 밖의 댓글 검색 대기분 정리
     for k in q("SELECT id FROM keywords"):
         rt = worker.reddit_terms(k["id"])
