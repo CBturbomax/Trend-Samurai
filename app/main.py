@@ -249,6 +249,8 @@ def add_own_subs(kid: int, body: SubsIn):
 
 class BoostIn(BaseModel):
     sub: str
+    posts_only: bool = False   # 댓글 작업은 그대로(댓글은 느려서 앞당기면 줄이 막힘)
+    kid: int = 0               # unboost: 이 키워드만
 
 
 class KidsIn(BaseModel):
@@ -285,7 +287,8 @@ def boost_comments(kid: int):
 def unboost_sub(body: BoostIn):
     """맨 앞에 세운 무거운 커뮤니티 작업을 보통 순서로 되돌림(줄을 막을 때)."""
     sub = _clean_sub(body.sub)
-    x("UPDATE jobs SET priority=3 WHERE kind='mention' AND lower(sub)=lower(?) AND priority<0 AND status IN ('queued','hold')", (sub,))
+    x("UPDATE jobs SET priority=3 WHERE kind='mention' AND lower(sub)=lower(?) AND priority<0 AND status IN ('queued','hold')"
+      + (" AND keyword_id=?" if body.kid else ""), (sub, body.kid) if body.kid else (sub,))
     return {"ok": True}
 
 
@@ -296,7 +299,8 @@ def boost_sub(kid: int, body: BoostIn):
     d = build(kid)
     have = (d.get("mentions") or {}).get(sub, {})
     months = [m for m in d["months"] if m >= C.MENTION_POST_START and m not in have]
-    x("UPDATE jobs SET priority=-20, tries=0, next_at=0 WHERE keyword_id=? AND kind='mention' AND sub=? AND status IN ('queued','hold')", (kid, sub))
+    x("UPDATE jobs SET priority=-20, tries=0, next_at=0 WHERE keyword_id=? AND kind='mention' AND sub=? AND status IN ('queued','hold')"
+      + (" AND term NOT LIKE 'c:%'" if body.posts_only else ""), (kid, sub))
     n = 0
     for t in worker.reddit_terms(kid):
         for m in months:
@@ -690,6 +694,8 @@ def build(kid: int):
     rterms = worker.reddit_terms(kid)
     mentions = mention_counts(rterms) if rterms else {}
     mentions_c = mention_counts(["c:" + rterms[0]]) if rterms else {}   # 댓글은 대표 검색어 하나만
+    if mentions_c:   # 댓글 검색을 안 하는 커뮤니티는 '수집 중'으로 보이지 않게 뺌
+        mentions_c = {sb: v for sb, v in mentions_c.items() if sb.lower() not in C.COMMENT_SKIP_SUBS}
 
     tr = {}
     for r in q("SELECT * FROM trends WHERE batch LIKE ? ORDER BY month", (f"{kid}:%",)):
