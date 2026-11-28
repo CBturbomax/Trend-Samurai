@@ -267,6 +267,14 @@ def boost_comments(kid: int):
     return {"ok": True}
 
 
+@app.post("/api/unboost_sub")
+def unboost_sub(body: BoostIn):
+    """맨 앞에 세운 무거운 커뮤니티 작업을 보통 순서로 되돌림(줄을 막을 때)."""
+    sub = _clean_sub(body.sub)
+    x("UPDATE jobs SET priority=3 WHERE kind='mention' AND lower(sub)=lower(?) AND priority<0 AND status IN ('queued','hold')", (sub,))
+    return {"ok": True}
+
+
 @app.post("/api/keywords/{kid}/boost_sub")
 def boost_sub(kid: int, body: BoostIn):
     """한 커뮤니티의 빈 달을 달 단위 작업으로 맨 앞에 세움(급히 채울 때)."""
