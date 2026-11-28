@@ -175,7 +175,10 @@ def _enqueue_keyword(kid, refresh=False):
         comment_from = all_months()[0 if full else -C.COMMENT_MONTHS]
         rt = reddit_terms(kid)
         cm_on = C.MENTION_COMMENTS or bool(q("SELECT 1 FROM keywords WHERE id=? AND name IN (%s)" % ",".join("?" * len(C.COMMENT_KEYWORDS)), (kid, *C.COMMENT_KEYWORDS)))
-        for t in rt + ([] if noc or not cm_on else [CPFX + t for t in rt[:1]]):   # 댓글은 대표 검색어 하나만(느려서 — 제품명까지 하면 몇 배)   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
+        bulk = _bulk(s["name"])
+        if bulk:   # 검색이 막혀 통째로 받는 커뮤니티: 글은 달별 받기 작업으로
+            enqueue_scans(s["name"], kid, 2)
+        for t in ([] if bulk else rt) + ([] if noc or not cm_on else [CPFX + t for t in rt[:1]]):   # 댓글은 대표 검색어 하나만(느려서 — 제품명까지 하면 몇 배)   # 글 제목 + 댓글 본문(안 되는 곳은 뺌)
             if refresh:  # 진행 중이던 달은 지우고 다시 셈
                 redo = {r["m"] for r in q(
                     "SELECT DISTINCT substr(start,1,7) m FROM mention_windows "
@@ -422,9 +425,11 @@ def do_scan(job):
         if p["n"] % 2000 < 100:
             x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (key, json.dumps(p), time.time()))
     st = "done" if today() >= dt.date.fromisoformat(b) else "open"
-    for t in terms:   # 이 달의 예전 조각 창은 지우고 달 하나로(겹쳐 세지 않게)
-        x("DELETE FROM mention_windows WHERE sub=? AND term=? AND substr(start,1,7)=?", (sub, t, m))
-        x("INSERT OR REPLACE INTO mention_windows VALUES(?,?,?,?,?,?,?)", (sub, t, a, b, cnt.get(t, 0), st, now_iso()))
+    names = {r["name"] for r in q("SELECT DISTINCT name FROM subreddits WHERE lower(name)=lower(?)", (sub,))} | {sub}   # 키워드마다 대소문자가 다르게 저장된 경우
+    for nm in names:
+        for t in terms:   # 이 달의 예전 조각 창은 지우고 달 하나로(겹쳐 세지 않게)
+            x("DELETE FROM mention_windows WHERE sub=? AND term=? AND substr(start,1,7)=?", (nm, t, m))
+            x("INSERT OR REPLACE INTO mention_windows VALUES(?,?,?,?,?,?,?)", (nm, t, a, b, cnt.get(t, 0), st, now_iso()))
     x("DELETE FROM jobs WHERE kind='mention' AND lower(sub)=lower(?) AND month=? AND (term IS NULL OR term NOT LIKE 'c:%') "
       "AND status IN ('queued','hold')", (sub, m))
     x("DELETE FROM meta WHERE key=?", (key,))
@@ -501,7 +506,7 @@ def do_mention(job):
         return _set(job, "failed", str(e)[:150])
     except arctic.SlowDown as e:
         tries = job["tries"] + 1
-        if not job["term"].startswith(CPFX) and tries >= 2:   # 글 검색이 두 번 막힘 → 감당할 만한 크기면 통째로 받아 직접 셈
+        if not job["term"].startswith(CPFX):   # 글 검색이 두 번 막힘 → 감당할 만한 크기면 통째로 받아 직접 셈
             try:
                 if _sub_volume(sub) <= SCAN_MAX_MONTHLY:
                     make_bulk(sub, job["keyword_id"], job.get("priority") or 3)
