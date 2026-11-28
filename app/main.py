@@ -260,6 +260,13 @@ def yt_deep(body: KidsIn):
     return {"ok": True, "jobs": n}
 
 
+@app.post("/api/keywords/{kid}/unboost_comments")
+def unboost_comments(kid: int):
+    """댓글 검색은 한 번에 수십 초 걸려 맨 앞에 두면 레딧 전체가 멈춤 → 글 뒤로."""
+    x("UPDATE jobs SET priority=5 WHERE keyword_id=? AND kind='mention' AND term LIKE 'c:%' AND status IN ('queued','hold')", (kid,))
+    return {"ok": True}
+
+
 @app.post("/api/keywords/{kid}/boost_comments")
 def boost_comments(kid: int):
     """그 키워드의 레딧 댓글 언급 작업을 맨 앞으로."""
