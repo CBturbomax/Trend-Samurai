@@ -59,6 +59,13 @@ def search_posts(sub, term, after, before, field="title"):
     return [d["created_utc"] for d in data]
 
 
+def list_posts(sub, after, before):
+    """검색 없이 그 기간 글 목록(최대 100개, 오래된 순). 검색이 막힌 커뮤니티는 이걸로 통째로 받아 직접 셈."""
+    return _get("/api/posts/search", {
+        "subreddit": sub, "after": after, "before": before,
+        "limit": 100, "sort": "asc", "fields": "id,created_utc,title,selftext"}, 90)
+
+
 def search_comments(sub, term, after, before):
     """본문에 term이 든 댓글의 created_utc 목록(최대 100개, 오래된 순). 글 검색보다 무거워 달 단위로 씀."""
     data = _get("/api/comments/search", {

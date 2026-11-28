@@ -2,6 +2,7 @@
 import json
 import datetime as dt
 import threading
+import re
 import time
 
 from . import autotune
@@ -41,7 +42,7 @@ def _add(kid, kind, priority, **kw):
     cols = ["sub", "term", "month", "start", "end", "gprop", "geo"]
     where = " AND ".join(f"IFNULL({c},'')=?" for c in cols)
     vals = [kw.get(c) or "" for c in cols]
-    own = "" if kind == "mention" else f" AND keyword_id={int(kid)}"
+    own = "" if kind in ("mention", "scan") else f" AND keyword_id={int(kid)}"
     if q(f"SELECT 1 FROM jobs WHERE kind=? AND status IN {ACTIVE} AND {where}{own} LIMIT 1", [kind] + vals):
         return
     if kind in ("yt", "mention", "trends", "discover", "totals") and _is_new(kid):
@@ -323,8 +324,118 @@ def _search(job, after, before):
     return call(arctic.search_posts, job["sub"], t, after, before, "title" if job["sub"].lower() in C.GIANT_SUBS else C.MENTION_FIELD)   # 거대 커뮤니티는 제목만, 나머지는 제목+본문
 
 
+# ── 검색이 막힌 커뮤니티: 그 달 글을 통째로 받아 모든 키워드를 한 번에 직접 셈 ──
+SCAN_MAX_MONTHLY = 20000   # 한 달 글이 이보다 많으면 통째 받기는 너무 무거움
+
+
+def _bulk(sub):
+    return bool(q("SELECT 1 FROM meta WHERE key=?", (f"bulk:{sub.lower()}",)))
+
+
+def _sub_volume(sub):
+    r = q("SELECT value FROM meta WHERE key=?", (f"vol:{sub.lower()}",))
+    if r:
+        return int(r[0]["value"])
+    ts = call(arctic.monthly_totals, sub, "posts")
+    v = max(ts.values()) if ts else 0
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"vol:{sub.lower()}", str(v), time.time()))
+    return v
+
+
+def _scan_terms(sub):
+    """이 커뮤니티를 보는 모든 키워드의 글 검색어."""
+    out = set()
+    for r in q("SELECT keyword_id FROM subreddits WHERE kind='mention' AND lower(name)=lower(?)", (sub,)):
+        out.update(reddit_terms(r["keyword_id"]))
+    return sorted(out)
+
+
+def _pat(t):
+    t = t.lower()
+    if not t.isascii():
+        return re.compile(re.escape(t))
+    toks = re.findall(r"[a-z0-9]+", t)
+    return re.compile(r"(?<![a-z0-9])" + r"[^a-z0-9]*".join(map(re.escape, toks)) + r"(?![a-z0-9])") if toks else None
+
+
+def make_bulk(sub, kid, prio):
+    """검색 대신 통째로 받기로 전환: 남은 글 검색 작업을 지우고 달별 받기 작업으로."""
+    x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (f"bulk:{sub.lower()}", "1", time.time()))
+    x("DELETE FROM jobs WHERE kind='mention' AND lower(sub)=lower(?) AND (term IS NULL OR term NOT LIKE 'c:%') "
+      "AND status IN ('queued','hold')", (sub,))
+    enqueue_scans(sub, kid, prio)
+
+
+def enqueue_scans(sub, kid, prio=3):
+    terms = _scan_terms(sub)
+    if not terms:
+        return
+    ph = ",".join("?" * len(terms))
+    have = {}
+    for r in q(f"SELECT term, start FROM mention_windows WHERE sub=? AND term IN ({ph}) AND status!='split'", (sub, *terms)):
+        have.setdefault(r["start"][:7], set()).add(r["term"])
+    for m in reversed(all_months()):
+        if m < C.MENTION_POST_START:
+            break
+        if len(have.get(m, ())) < len(terms):
+            _add(kid, "scan", prio, sub=sub, month=m)
+
+
+def do_scan(job):
+    import json
+    sub, m = job["sub"], job["month"]
+    a, b = month_bounds(m)
+    key = f"scanp:{sub.lower()}:{m}"
+    terms = _scan_terms(sub)
+    pats = {t: _pat(t) for t in terms}
+    title_only = sub.lower() in C.GIANT_SUBS
+    r = q("SELECT value FROM meta WHERE key=?", (key,))
+    p = json.loads(r[0]["value"]) if r else {"after": a, "ids": [], "cnt": {}, "n": 0}
+    cnt = p["cnt"]
+    while True:
+        try:
+            page = None
+            for i in range(6):
+                try:
+                    page = call(arctic.list_posts, sub, p["after"], b)
+                    break
+                except arctic.SlowDown:
+                    if i == 5:
+                        raise
+        except arctic.SlowDown as e:   # 받은 데까지 저장, 나머지는 나중에 이어서
+            x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (key, json.dumps(p), time.time()))
+            return _set(job, "queued", f"{e} · {p['n']}개 받음, 이어서", time.time() + 300, job["tries"] + 1)
+        seen = set(p["ids"])
+        new = [d for d in page if d["id"] not in seen]
+        for d in new:
+            txt = (d.get("title") or "") if title_only else (d.get("title") or "") + "\n" + (d.get("selftext") or "")
+            txt = txt.lower()
+            for t, pt in pats.items():
+                if pt and pt.search(txt):
+                    cnt[t] = cnt.get(t, 0) + 1
+        p["n"] += len(new)
+        if len(page) < 100 or not new:
+            break
+        last = page[-1]["created_utc"]
+        p["ids"] = [d["id"] for d in page if d["created_utc"] == last]
+        p["after"] = last
+        if p["n"] % 2000 < 100:
+            x("INSERT OR REPLACE INTO meta VALUES(?,?,?)", (key, json.dumps(p), time.time()))
+    st = "done" if today() >= dt.date.fromisoformat(b) else "open"
+    for t in terms:   # 이 달의 예전 조각 창은 지우고 달 하나로(겹쳐 세지 않게)
+        x("DELETE FROM mention_windows WHERE sub=? AND term=? AND substr(start,1,7)=?", (sub, t, m))
+        x("INSERT OR REPLACE INTO mention_windows VALUES(?,?,?,?,?,?,?)", (sub, t, a, b, cnt.get(t, 0), st, now_iso()))
+    x("DELETE FROM jobs WHERE kind='mention' AND lower(sub)=lower(?) AND month=? AND (term IS NULL OR term NOT LIKE 'c:%') "
+      "AND status IN ('queued','hold')", (sub, m))
+    x("DELETE FROM meta WHERE key=?", (key,))
+    _set(job, "done", f"글 {p['n']}개 받아 {len(terms)}개 검색어 셈")
+
+
 def do_mention(job):
     sub = job["sub"]
+    if not job["term"].startswith(CPFX) and _bulk(sub):   # 통째로 받기로 바뀐 커뮤니티
+        enqueue_scans(sub, job["keyword_id"], job.get("priority") or 3)
+        return _set(job, "done", "통째로 받기로 대신")
     a, b = dt.date.fromisoformat(job["start"]), dt.date.fromisoformat(job["end"])
     days = (b - a).days
     was_hold = job["status_before"] == "hold"
@@ -390,6 +501,13 @@ def do_mention(job):
         return _set(job, "failed", str(e)[:150])
     except arctic.SlowDown as e:
         tries = job["tries"] + 1
+        if not job["term"].startswith(CPFX) and tries >= 2:   # 글 검색이 두 번 막힘 → 감당할 만한 크기면 통째로 받아 직접 셈
+            try:
+                if _sub_volume(sub) <= SCAN_MAX_MONTHLY:
+                    make_bulk(sub, job["keyword_id"], job.get("priority") or 3)
+                    return _set(job, "done", f"{e} → 검색 대신 통째로 받기")
+            except arctic.SlowDown:
+                pass
         st = state["sub_streak"][sub] = state["sub_streak"].get(sub, 0) + 1
         later = time.time() + 6 * 3600
         if was_hold:  # 보류 재시도도 실패 → 이 서브레딧 보류분 전부 뒤로
@@ -901,11 +1019,12 @@ def do_pin(job):
 
 
 HANDLERS["pin"] = do_pin
+HANDLERS["scan"] = do_scan
 
 
 # 사이트별로 줄을 따로 세워 동시에 처리(같은 사이트 안에서는 여전히 한 번에 하나)
 GROUPS = {
-    "reddit": ("totals", "mention", "discover"),
+    "reddit": ("totals", "mention", "discover", "scan"),
     "redditc": ("mention",),   # 레딧 댓글 언급만(느림) — 글 수집과 따로 돌림
     "youtube": ("yt", "ytc", "ytstats"),
     "etc": ("trends", "tiktok", "global"),
@@ -924,7 +1043,7 @@ def _next(kinds=None, group=None):
             state["rturn"] = state.get("rturn", 0) + 1
             if state["rturn"] % 2 == 0:
                 r = q("SELECT j.* FROM jobs j LEFT JOIN krank k ON k.keyword_id=j.keyword_id "
-                      f"WHERE j.status='queued' AND j.next_at<=? AND j.kind='mention' AND {cf} "
+                      f"WHERE j.status='queued' AND j.next_at<=? AND j.kind IN ('mention','scan') AND {cf} "
                       "ORDER BY j.priority, IFNULL(k.rank,9999), j.tries, j.month DESC, j.id LIMIT 1", (now,))
         if not r:
             r = q(f"SELECT j.* FROM jobs j LEFT JOIN krank k ON k.keyword_id=j.keyword_id "
@@ -959,6 +1078,8 @@ def _next(kinds=None, group=None):
 
 
 def describe(j):
+    if j["kind"] == "scan":
+        return f"r/{j['sub']} {j['month']} 글 통째로 받아 세는 중" + (f" (재시도 {j['tries']}회)" if j["tries"] else "")
     if j["kind"] == "mention":
         span = j["month"] if (j["start"], j["end"]) == month_bounds(j["month"]) else f"{j['start']}~{j['end']}"
         s = f"r/{j['sub']} '{j['term']}' {span} 언급 검색"
