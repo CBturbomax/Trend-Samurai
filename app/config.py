@@ -43,7 +43,7 @@ MENTION_FIELD = "query"                                        # 글 언급: 제
 GIANT_SUBS = {s.lower() for s in """anime gaming games pcgaming truegaming japan japantravel japantraveltips tokyo japanlife costco traderjoes
 femalefashionadvice malefashionadvice streetwear sneakers running watches buyitforlife cooking fastfood edc toys collectibles
 nostalgia 90s fishing cycling bicycling camping campinggear hiking loseit gym supplements nutrition nyc foodporn
-skincareaddiction makeupaddiction beauty asianbeauty sephora ulta tennis 10s pickleball parenting toddlers daddit
+skincareaddiction asianbeauty tennis 10s pickleball parenting toddlers daddit
 smartglasses gadgets kawaii plushies blindboxes actionfigures tcg anime_irl
 food travel cleaningtips homeimprovement frugal frugalmalefashion nintendoswitch ps5 hiking ultralight""".split()}
 MENTION_COMMENTS = False                                       # 댓글 본문 언급 검색(무겁고 거의 안 받아짐 → 끔, 글 언급에 집중)

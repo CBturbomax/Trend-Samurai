@@ -78,6 +78,12 @@ async def lifespan(app):
         x(f"DELETE FROM mention_windows WHERE term NOT LIKE 'c:%' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
         x(f"DELETE FROM jobs WHERE kind='mention' AND status!='done' AND lower(sub) IN ({','.join('?'*len(gs))})", gs)
         x("INSERT OR REPLACE INTO meta VALUES('giant_title_v1','1',?)", (time.time(),))
+    # 세포라·얼타·beauty·MakeupAddiction은 제목만 세면 본문 언급(실제의 1/3~1/4)이 빠짐 → 제목+본문으로 다시(한 번만)
+    if not q("SELECT 1 FROM meta WHERE key='fulltext_v2'"):
+        fs = ["sephora", "ulta", "beauty", "makeupaddiction"]
+        x(f"DELETE FROM mention_windows WHERE term NOT LIKE 'c:%' AND lower(sub) IN ({','.join('?'*len(fs))})", fs)
+        x(f"DELETE FROM jobs WHERE kind='mention' AND term NOT LIKE 'c:%' AND status!='done' AND lower(sub) IN ({','.join('?'*len(fs))})", fs)
+        x("INSERT OR REPLACE INTO meta VALUES('fulltext_v2','1',?)", (time.time(),))
     for sb in C.COMMENT_SKIP_SUBS:   # 댓글 검색이 안 되는 초대형 커뮤니티: 댓글 작업 정리 + 다시 안 넣게 표시
         x("INSERT OR IGNORE INTO meta VALUES(?,?,?)", (f"nocomment:{sb}", "1", time.time()))
         x("DELETE FROM jobs WHERE kind='mention' AND term LIKE 'c:%' AND lower(sub)=? AND status!='done'", (sb,))
